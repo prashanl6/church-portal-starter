@@ -1,5 +1,8 @@
 {
-  "/sermons/page": "app/sermons/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/notices/page": "app/notices/page.js",
-  "/book-hall/page": "app/book-hall/page.js"
+  "/sermons/page": "app/sermons/page.js",
+  "/book-hall/page": "app/book-hall/page.js",
+  "/page": "app/page.js",
+  "/api/notices/route": "app/api/notices/route.js"
 }
