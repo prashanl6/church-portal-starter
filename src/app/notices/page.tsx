@@ -59,73 +59,63 @@ export default function NoticesPage() {
   if (selectedNotice) {
     return (
       <div style={{ minHeight: '100vh' }}>
-        <div style={{
-          position: 'sticky',
-          top: 0,
-          backgroundColor: 'white',
-          borderBottom: '1px solid rgb(226, 232, 240)',
-          zIndex: 10,
-          marginBottom: '2rem'
+        <div className="card" style={{
+          marginBottom: '2rem',
+          animation: 'slideIn 0.4s ease-out'
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '1rem',
-            paddingTop: '1rem',
-            paddingBottom: '1rem'
+            marginBottom: '1.5rem'
           }}>
             <button
               onClick={() => setSelectedNotice(null)}
+              className="btn-secondary"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '2.5rem',
                 height: '2.5rem',
-                borderRadius: '0.5rem',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s'
+                padding: 0,
+                flexShrink: 0
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(241, 245, 249)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="Back to notices"
             >
-              <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div>
-              <h1 style={{
-                fontSize: '1.5rem',
-                fontWeight: 700,
-                color: 'rgb(15, 23, 42)',
-                margin: 0
+            <div style={{ flex: 1 }}>
+              <h1 className="page-title" style={{
+                fontSize: '1.75rem',
+                marginBottom: '0.5rem',
+                marginTop: 0
               }}>{selectedNotice.title}</h1>
               <p style={{
                 fontSize: '0.875rem',
                 color: 'rgb(100, 116, 139)',
-                margin: '0.25rem 0 0 0'
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
               }}>
-                {new Date(selectedNotice.weekOf).toLocaleDateString('en-US', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric'
-                })}
+                <span>📅</span>
+                <span>
+                  {new Date(selectedNotice.weekOf).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
               </p>
             </div>
           </div>
-        </div>
 
-        <div style={{
-          maxWidth: '48rem',
-          marginLeft: 'auto',
-          marginRight: 'auto',
-          paddingTop: '2rem',
-          paddingBottom: '2rem'
-        }}>
           <article 
+            className="notice-content"
             style={{
               fontSize: '1.1rem',
               lineHeight: 1.75,
@@ -141,31 +131,33 @@ export default function NoticesPage() {
   return (
     <div style={{ minHeight: '100vh' }}>
       <div style={{ paddingTop: '3rem', paddingBottom: '3rem' }}>
-        <h1 style={{
-          fontSize: '2rem',
-          fontWeight: 700,
-          color: 'rgb(15, 23, 42)',
-          marginBottom: '2rem'
-        }}>Notices</h1>
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>Notices</h1>
+          <p className="page-subtitle" style={{ marginBottom: 0 }}>
+            Stay updated with the latest announcements and church news
+          </p>
+        </div>
 
         {notices.length === 0 ? (
-          <div style={{
+          <div className="card" style={{
             textAlign: 'center',
             paddingTop: '3rem',
             paddingBottom: '3rem'
           }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📢</div>
             <p style={{
               color: 'rgb(100, 116, 139)',
-              fontSize: '1.125rem'
+              fontSize: '1.125rem',
+              margin: 0
             }}>No notices available</p>
           </div>
         ) : (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.75rem'
+            gap: '1rem'
           }}>
-            {notices.map(notice => {
+            {notices.map((notice, index) => {
               const dateStr = new Date(notice.weekOf).toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -177,27 +169,18 @@ export default function NoticesPage() {
                 <button
                   key={notice.id}
                   onClick={() => setSelectedNotice(notice)}
+                  className="card"
                   style={{
                     width: '100%',
-                    backgroundColor: 'white',
-                    border: '1px solid rgb(226, 232, 240)',
-                    borderRadius: '0.5rem',
-                    padding: '1.25rem',
                     textAlign: 'left',
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
-                    gap: '1rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgb(191, 219, 254)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'rgb(226, 232, 240)';
-                    e.currentTarget.style.boxShadow = 'none';
+                    gap: '1rem',
+                    animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`,
+                    border: 'none',
+                    padding: '1.5rem'
                   }}
                 >
                   <div style={{ flex: 1 }}>

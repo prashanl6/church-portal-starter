@@ -22,43 +22,124 @@ export default function BookHallPage() {
   };
 
   return (
-    <div className="grid gap-6">
-      <h1 className="text-2xl font-semibold">Book the Hall</h1>
-      <div className="card">
-        <h2 className="text-xl font-semibold mb-2">Availability (booked dates)</h2>
-        <ul className="list-disc pl-5">{booked.map((b,i)=>(<li key={i}>{new Date(b.date).toDateString()} {b.startTime}-{b.endTime}</li>))}</ul>
+    <div style={{ display: 'grid', gap: '2rem' }}>
+      <div>
+        <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>Book the Hall</h1>
+        <p className="page-subtitle" style={{ marginBottom: 0 }}>
+          Reserve the hall or chapel for your events and gatherings
+        </p>
       </div>
-      <form onSubmit={submit} className="card grid gap-3">
-        <div className="grid gap-2">
-          <label className="label">Full Name</label>
-          <input className="input" value={form.fullName} onChange={e=>setForm({...form, fullName:e.target.value})} />
+      <div className="card">
+        <h2 style={{ 
+          fontSize: '1.25rem', 
+          fontWeight: 600, 
+          marginBottom: '1rem',
+          color: 'rgb(15, 23, 42)'
+        }}>
+          📅 Availability (booked dates)
+        </h2>
+        {booked.length === 0 ? (
+          <p style={{ color: 'rgb(100, 116, 139)', margin: 0 }}>
+            No bookings scheduled yet
+          </p>
+        ) : (
+          <ul style={{ 
+            listStyle: 'none', 
+            padding: 0, 
+            margin: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}>
+            {booked.map((b, i) => (
+              <li 
+                key={i}
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: 'rgb(248, 250, 252)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid rgb(226, 232, 240)'
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>
+                  {new Date(b.date).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </span>
+                <span style={{ color: 'rgb(71, 85, 105)', marginLeft: '0.5rem' }}>
+                  {b.startTime} - {b.endTime}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <form onSubmit={submit} className="card" style={{ display: 'grid', gap: '1.5rem' }}>
+        <h2 style={{ 
+          fontSize: '1.25rem', 
+          fontWeight: 600, 
+          marginBottom: '0.5rem',
+          color: 'rgb(15, 23, 42)'
+        }}>
+          📝 Booking Request
+        </h2>
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            <label className="label">Full Name</label>
+            <input className="input" value={form.fullName} onChange={e=>setForm({...form, fullName:e.target.value})} />
+          </div>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            <label className="label">Email</label>
+            <input type="email" className="input" value={form.email} onChange={e=>setForm({...form, email:e.target.value})} />
+          </div>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            <label className="label">Phone</label>
+            <input type="tel" className="input" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} />
+          </div>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            <label className="label">Purpose</label>
+            <input className="input" value={form.purpose} onChange={e=>setForm({...form, purpose:e.target.value})} required />
+          </div>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            <label className="label">Hall</label>
+            <select className="input" value={form.hall} onChange={e=>setForm({...form, hall:e.target.value})}>
+              <option>Main Hall</option>
+              <option>Chapel</option>
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              <label className="label">Date</label>
+              <input type="date" className="input" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} />
+            </div>
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              <label className="label">Start Time</label>
+              <input type="time" className="input" value={form.startTime} onChange={e=>setForm({...form, startTime:e.target.value})} />
+            </div>
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              <label className="label">End Time</label>
+              <input type="time" className="input" value={form.endTime} onChange={e=>setForm({...form, endTime:e.target.value})} />
+            </div>
+          </div>
         </div>
-        <div className="grid gap-2">
-          <label className="label">Email</label>
-          <input className="input" value={form.email} onChange={e=>setForm({...form, email:e.target.value})} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <button className="btn btn-primary" style={{ width: 'fit-content' }}>Submit Request</button>
+          {msg && (
+            <p style={{ 
+              padding: '0.75rem 1rem',
+              borderRadius: '0.5rem',
+              backgroundColor: msg.includes('submitted') ? 'rgb(220, 252, 231)' : 'rgb(254, 226, 226)',
+              color: msg.includes('submitted') ? 'rgb(22, 101, 52)' : 'rgb(153, 27, 27)',
+              margin: 0,
+              fontSize: '0.875rem'
+            }}>
+              {msg}
+            </p>
+          )}
         </div>
-        <div className="grid gap-2">
-          <label className="label">Phone</label>
-          <input className="input" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} />
-        </div>
-        <div className="grid gap-2">
-          <label className="label">Purpose</label>
-          <input className="input" value={form.purpose} onChange={e=>setForm({...form, purpose:e.target.value})} required />
-        </div>
-        <div className="grid gap-2">
-          <label className="label">Hall</label>
-          <select className="input" value={form.hall} onChange={e=>setForm({...form, hall:e.target.value})}>
-            <option>Main Hall</option>
-            <option>Chapel</option>
-          </select>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div><label className="label">Date</label><input type="date" className="input" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} /></div>
-          <div><label className="label">Start</label><input type="time" className="input" value={form.startTime} onChange={e=>setForm({...form, startTime:e.target.value})} /></div>
-          <div><label className="label">End</label><input type="time" className="input" value={form.endTime} onChange={e=>setForm({...form, endTime:e.target.value})} /></div>
-        </div>
-        <button className="btn w-fit">Submit Request</button>
-        <p>{msg}</p>
       </form>
     </div>
   );
