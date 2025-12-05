@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { fetchFacebookViews } from './facebook';
 
 export async function submitApproval(resourceType: string, resourceId: number, action: string, submitterId: number) {
   return prisma.approval.create({
@@ -21,6 +22,20 @@ export async function approve(resourceType: string, resourceId: number, approver
     if (approval.action === 'publish') {
       if (approval.resourceType === 'notice') {
         await prisma.notice.update({ where: { id: approval.resourceId }, data: { status: 'published' } });
+      }
+      if (approval.resourceType === 'sermon') {
+        // Try to fetch views from Facebook link when publishing
+        const sermon = await prisma.sermon.findUnique({ where: { id: approval.resourceId } });
+        let viewsUpdate: number | undefined = undefined;
+        if (sermon && sermon.link) {
+          try {
+            const fetched = await fetchFacebookViews(sermon.link);
+            if (typeof fetched === 'number') viewsUpdate = fetched;
+          } catch (e) {
+            // ignore facebook fetch errors
+          }
+        }
+        await prisma.sermon.update({ where: { id: approval.resourceId }, data: { status: 'published', ...(viewsUpdate !== undefined ? { views: viewsUpdate } : {}) } });
       }
     }
     

@@ -321,3 +321,21 @@ nav a {
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
+
+/* Ensure the app layout is full-height and allow main content to scroll
+   while keeping the header sticky. This prevents accidental page-level
+   overflow:hidden issues and makes scrolling predictable. */
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main.container {
+  flex: 1 1 auto;
+  overflow: auto;
+}

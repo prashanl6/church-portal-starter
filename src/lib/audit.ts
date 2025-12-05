@@ -11,8 +11,6 @@ export async function audit(actorId: number, action: string, resourceType: strin
       resourceId,
       beforeJson: beforeJson ? JSON.stringify(beforeJson) : null,
       afterJson: afterJson ? JSON.stringify(afterJson) : null,
-      ip: h.get('x-forwarded-for') || 'local',
-      userAgent: h.get('user-agent') || 'unknown',
     }
   });
 }
