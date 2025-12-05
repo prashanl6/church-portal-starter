@@ -7,8 +7,16 @@ export default function ApprovalsPage() {
   const { data, mutate } = useSWR('/api/approvals', fetcher);
   const approve = async (a:any) => {
     const res = await fetch('/api/approvals/approve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ resourceType:a.resourceType, resourceId:a.resourceId, comment:'OK' }) });
+    if (res.status === 401) {
+      alert('Your session has expired. Please log in again.');
+      window.location.href = '/login';
+      return;
+    }
     if (res.ok) mutate();
-    else alert(await res.text());
+    else {
+      const errorText = await res.text();
+      alert(errorText || 'Failed to approve');
+    }
   }
   return (
     <div className="grid gap-4">

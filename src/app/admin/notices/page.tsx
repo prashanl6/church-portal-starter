@@ -26,11 +26,19 @@ export default function NoticesAdminPage() {
         weekOf: new Date(form.weekOf).toISOString()
       })
     });
+    if (res.status === 401) {
+      alert('Your session has expired. Please log in again.');
+      window.location.href = '/login';
+      return;
+    }
     if (res.ok) {
       alert('Notice submitted for approval');
       setForm({ title: '', bodyHtml: '', weekOf: new Date().toISOString().split('T')[0] });
       mutate();
-    } else alert(await res.text());
+    } else {
+      const errorText = await res.text();
+      alert(errorText || 'Failed to submit notice');
+    }
   };
 
   const getStatusBadge = (status: string) => {

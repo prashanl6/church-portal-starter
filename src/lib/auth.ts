@@ -23,13 +23,19 @@ export function clearAuthCookie() {
 }
 
 export function getUserFromCookie(): { id: number, role: string, email: string } | null {
-  const cookieStore = cookies();
-  const token = cookieStore.get('token')?.value;
-  if (!token) return null;
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as any;
-    return { id: Number(payload.sub), role: payload.role, email: payload.email };
-  } catch {
+    const cookieStore = cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) return null;
+    try {
+      const payload = jwt.verify(token, JWT_SECRET) as any;
+      return { id: Number(payload.sub), role: payload.role, email: payload.email };
+    } catch (err) {
+      // Token expired or invalid
+      return null;
+    }
+  } catch (err) {
+    // Error reading cookies
     return null;
   }
 }

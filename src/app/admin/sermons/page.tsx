@@ -41,7 +41,48 @@ export default function AdminSermonsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, speaker, theme, link, date: weekOf, dateIso: weekOf })
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (res.status === 401 || res.status === 403) {
+        let errorMsg = 'Your session has expired. Please log in again.';
+        try {
+          const errorData = await res.json();
+          errorMsg = errorData.error || errorMsg;
+        } catch {
+          // If not JSON, use default message
+        }
+        setMsg(errorMsg);
+        setTimeout(() => window.location.href = '/login', 2000);
+        return;
+      }
+      if (!res.ok) {
+        let errorMsg = 'Failed to submit sermon';
+        const contentType = res.headers.get('content-type') || '';
+        
+        // Check if we got HTML (404 page) instead of JSON
+        if (contentType.includes('text/html')) {
+          errorMsg = 'API route not found. Please restart the development server.';
+          console.error('Received HTML instead of JSON. This usually means the API route is not being recognized.');
+        } else if (contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            errorMsg = errorData.error || errorMsg;
+          } catch {
+            // Fallback to default
+          }
+        } else {
+          try {
+            const text = await res.text();
+            // If it looks like HTML, it's probably a 404 page
+            if (text.trim().startsWith('<!DOCTYPE') || text.includes('404')) {
+              errorMsg = 'API route not found. Please restart the development server.';
+            } else {
+              errorMsg = text || errorMsg;
+            }
+          } catch {
+            // Fallback to default
+          }
+        }
+        throw new Error(errorMsg);
+      }
       const body = await res.json();
       setMsg('Sermon submitted for approval');
       setTitle(''); setSpeaker(''); setTheme(''); setLink(''); setWeekOf('');
@@ -70,7 +111,18 @@ export default function AdminSermonsPage() {
           <button className="btn" type="submit" disabled={loading}>{loading ? 'Submitting...' : 'Submit for Approval'}</button>
           <button type="button" className="btn-secondary" onClick={() => { setTitle(''); setSpeaker(''); setTheme(''); setLink(''); setWeekOf(''); setMsg(''); }}>Reset</button>
         </div>
-        {msg && <div className="text-sm text-muted">{msg}</div>}
+        {msg && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            backgroundColor: msg.includes('submitted') ? 'rgb(220, 252, 231)' : msg.includes('expired') || msg.includes('log in') ? 'rgb(254, 242, 242)' : 'rgb(254, 242, 242)',
+            color: msg.includes('submitted') ? 'rgb(22, 101, 52)' : 'rgb(153, 27, 27)',
+            border: `1px solid ${msg.includes('submitted') ? 'rgb(187, 247, 208)' : 'rgb(254, 205, 211)'}`
+          }}>
+            {msg}
+          </div>
+        )}
       </form>
     </div>
   );

@@ -11,8 +11,28 @@ export default function AssetsPage() {
   const submit = async (e:any) => {
     e.preventDefault();
     const res = await fetch('/api/admin/assets', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form)});
-    if (res.ok) { alert('Draft created and submitted for dual approval'); mutate(); }
-    else alert(await res.text());
+    if (res.status === 401 || res.status === 403) {
+      alert('Your session has expired. Please log in again.');
+      window.location.href = '/login';
+      return;
+    }
+    if (res.ok) { 
+      alert('Draft created and submitted for dual approval'); 
+      mutate(); 
+    } else {
+      let errorMsg = 'Failed to submit';
+      try {
+        const errorData = await res.json();
+        errorMsg = errorData.error || errorMsg;
+      } catch {
+        try {
+          errorMsg = await res.text() || errorMsg;
+        } catch {
+          // Use default
+        }
+      }
+      alert(errorMsg);
+    }
   };
 
   return (

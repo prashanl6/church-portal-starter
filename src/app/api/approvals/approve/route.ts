@@ -5,7 +5,9 @@ import { getUserFromCookie } from '@/lib/auth';
 export async function POST(req: Request) {
   const { resourceType, resourceId, comment } = await req.json();
   const u = getUserFromCookie();
-  if (!u) return new NextResponse('Unauthorized', { status: 401 });
+  if (!u) {
+    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
+  }
   try {
     const result = await approve(resourceType, Number(resourceId), u.id, comment || '');
     return NextResponse.json({ ok: true, result });
