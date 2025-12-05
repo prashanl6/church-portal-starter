@@ -1,0 +1,323 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: linear-gradient(to bottom, rgb(248, 250, 252), rgb(255, 255, 255));
+  color: rgb(15, 23, 42);
+  font-family: 'Poppins', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif;
+  font-size: 18px;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+}
+
+/* Layout container */
+.container {
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Header & nav */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.app-header-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .app-header-inner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+.app-title {
+  background: linear-gradient(to right, rgb(37, 99, 235), rgb(29, 78, 216));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (min-width: 768px) {
+  .app-title {
+    font-size: 2.25rem;
+  }
+}
+
+.app-subtitle {
+  font-size: 0.875rem;
+  color: rgb(71, 85, 105);
+  font-weight: 500;
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .app-nav {
+    gap: 0.75rem;
+  }
+}
+
+.app-nav-link {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(55, 65, 81);
+  background-color: rgb(226, 232, 240);
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+@media (min-width: 768px) {
+  .app-nav-link {
+    font-size: 1rem;
+  }
+}
+
+.app-nav-link:hover {
+  background-color: rgb(219, 234, 254);
+  color: rgb(37, 99, 235);
+  border-color: rgb(191, 219, 254);
+}
+
+/* Generic sections */
+.page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: rgb(15, 23, 42);
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .page-title {
+    font-size: 2.25rem;
+  }
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: rgb(71, 85, 105);
+  margin-bottom: 1.5rem;
+}
+
+/* Cards */
+.card {
+  background-color: white;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgb(226, 232, 240);
+  transition: all 0.3s;
+}
+
+@media (min-width: 768px) {
+  .card {
+    padding: 2rem;
+  }
+}
+
+.card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  border-color: rgb(191, 219, 254);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(to right, rgb(37, 99, 235), rgb(29, 78, 216));
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:hover {
+  background: linear-gradient(to right, rgb(29, 78, 216), rgb(25, 63, 182));
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid rgb(37, 99, 235);
+  outline-offset: 2px;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  background-color: rgb(226, 232, 240);
+  color: rgb(30, 41, 59);
+  font-size: 1rem;
+  font-weight: 600;
+  border: 1px solid rgb(203, 213, 225);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: rgb(203, 213, 225);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid rgb(37, 99, 235);
+  outline-offset: 2px;
+}
+
+.btn-link {
+  color: rgb(37, 99, 235);
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.btn-link:hover {
+  color: rgb(29, 78, 216);
+}
+
+/* Inputs & forms */
+.label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: rgb(55, 65, 81);
+}
+
+.input,
+textarea.input,
+select.input {
+  border: 1px solid rgb(209, 213, 219);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  font-size: 1rem;
+  background-color: white;
+  transition: all 0.2s;
+}
+
+.input:focus,
+textarea.input:focus,
+select.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(37, 99, 235);
+  border-color: rgb(37, 99, 235);
+}
+
+.input::placeholder {
+  color: rgb(148, 163, 184);
+}
+
+input[type="date"].input,
+input[type="time"].input {
+  font-size: 1rem;
+}
+
+/* Lists */
+.simple-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 1rem;
+}
+
+.simple-list li {
+  color: rgb(55, 65, 81);
+  line-height: 1.75;
+}
+
+/* Links */
+a {
+  color: rgb(37, 99, 235);
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: rgb(29, 78, 216);
+}
+
+nav a {
+  text-decoration: none;
+}
+
+/* Utility classes */
+.gradient-text {
+  background: linear-gradient(to right, rgb(37, 99, 235), rgb(29, 78, 216));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-effect {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}

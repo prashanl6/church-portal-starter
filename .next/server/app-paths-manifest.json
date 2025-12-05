@@ -1,0 +1,21 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/notices/page": "app/admin/notices/page.js",
+  "/admin/approvals/page": "app/admin/approvals/page.js",
+  "/api/admin/notices/route": "app/api/admin/notices/route.js",
+  "/admin/assets/page": "app/admin/assets/page.js",
+  "/api/admin/assets/route": "app/api/admin/assets/route.js",
+  "/api/approvals/approve/route": "app/api/approvals/approve/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/approvals/route": "app/api/approvals/route.js",
+  "/api/bookings/request/route": "app/api/bookings/request/route.js",
+  "/api/bookings/availability/route": "app/api/bookings/availability/route.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/notices/page": "app/notices/page.js",
+  "/api/sermons/view/route": "app/api/sermons/view/route.js",
+  "/book-hall/page": "app/book-hall/page.js",
+  "/sermons/page": "app/sermons/page.js",
+  "/api/notices/route": "app/api/notices/route.js"
+}
