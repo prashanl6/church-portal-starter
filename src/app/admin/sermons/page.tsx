@@ -14,15 +14,41 @@ export default function AdminSermonsPage() {
   const sundays = useMemo(() => {
     const list: string[] = [];
     const today = new Date();
+    // Set to start of today (midnight) in local timezone to avoid timezone issues
+    today.setHours(0, 0, 0, 0);
+    
     // find most recent past Sunday (including today if today is Sunday)
-    const day = today.getDay();
+    const day = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    // If today is Sunday (0), we want today. Otherwise, go back to the previous Sunday
     const daysToLastSunday = day === 0 ? 0 : day;
+    
+    // Start from the most recent Sunday
     const base = new Date(today);
     base.setDate(base.getDate() - daysToLastSunday);
+    
+    // Double-check: ensure base is actually a Sunday
+    if (base.getDay() !== 0) {
+      // If somehow it's not Sunday, adjust to the previous Sunday
+      const currentDay = base.getDay();
+      base.setDate(base.getDate() - currentDay);
+    }
+    
+    // Generate 520 Sundays going backwards
     for (let i = 0; i < 520; i++) {
       const d = new Date(base);
-      d.setDate(base.getDate() - i * 7);
-      list.push(d.toISOString().slice(0, 10));
+      d.setDate(base.getDate() - (i * 7));
+      d.setHours(0, 0, 0, 0); // Ensure midnight local time
+      
+      // Format as YYYY-MM-DD in local timezone
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dayOfMonth = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${dayOfMonth}`;
+      
+      // Verify this is actually a Sunday before adding
+      if (d.getDay() === 0) {
+        list.push(dateStr);
+      }
     }
     return list;
   }, []);
@@ -103,9 +129,15 @@ export default function AdminSermonsPage() {
         <label className="flex flex-col"><span>Week Of (past Sundays only)</span>
           <select className="input" value={weekOf} onChange={e => setWeekOf(e.target.value)}>
             <option value="">Select a Sunday</option>
-            {sundays.map(d => (
-              <option key={d} value={d}>{new Date(d).toDateString()}</option>
-            ))}
+            {sundays.map(d => {
+              // Parse the date string and create a date in local timezone
+              const date = new Date(d + 'T00:00:00');
+              const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+              const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+              return (
+                <option key={d} value={d}>{dayName}, {dateStr}</option>
+              );
+            })}
           </select>
         </label>
         <div className="flex gap-2">

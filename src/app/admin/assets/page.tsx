@@ -17,7 +17,7 @@ export default function AssetsPage() {
       return;
     }
     if (res.ok) { 
-      alert('Draft created and submitted for dual approval'); 
+      alert('Asset created and submitted for approval'); 
       mutate(); 
     } else {
       let errorMsg = 'Failed to submit';
@@ -46,7 +46,7 @@ export default function AssetsPage() {
           <div><label className="label">Category</label><select className="input" value={form.labelCategory} onChange={e=>setForm({...form, labelCategory:e.target.value})}><option>chapel</option><option>hall</option></select></div>
         </div>
         <div><label className="label">Notes</label><input className="input" value={form.notes} onChange={e=>setForm({...form, notes:e.target.value})}/></div>
-        <button className="btn w-fit">Save (needs 2 approvals)</button>
+        <button className="btn w-fit">Save (needs approval)</button>
       </form>
       <div className="grid gap-2">
         {(data?.list||[]).map((a:any)=>(<div key={a.id} className="card"><div className="font-semibold">{a.reference}</div><div className="text-sm">Qty {a.quantity} · LKR {a.value} · {a.labelCategory}</div></div>))}

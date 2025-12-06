@@ -1,36 +1,250 @@
 'use client';
 import useSWR from 'swr';
+import { useState } from 'react';
 
 const fetcher = (url:string) => fetch(url).then(r=>r.json());
 
+type FilterStatus = 'all' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+
 export default function ApprovalsPage() {
+  const [filter, setFilter] = useState<FilterStatus>('all');
   const { data, mutate } = useSWR('/api/approvals', fetcher);
+  const [comment, setComment] = useState<{ [key: number]: string }>({});
+  const [showActions, setShowActions] = useState<{ [key: number]: boolean }>({});
+  
+  // Filter the approvals based on selected filter
+  const filteredList = data?.list ? (filter === 'all' 
+    ? data.list 
+    : data.list.filter((a: any) => a.status === filter)
+  ) : [];
+
   const approve = async (a:any) => {
-    const res = await fetch('/api/approvals/approve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ resourceType:a.resourceType, resourceId:a.resourceId, comment:'OK' }) });
+    const res = await fetch('/api/approvals/approve', { 
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify({ 
+        resourceType:a.resourceType, 
+        resourceId:a.resourceId, 
+        comment: comment[a.id] || 'Approved' 
+      }) 
+    });
     if (res.status === 401) {
       alert('Your session has expired. Please log in again.');
       window.location.href = '/login';
       return;
     }
-    if (res.ok) mutate();
-    else {
+    if (res.ok) {
+      setComment({ ...comment, [a.id]: '' });
+      setShowActions({ ...showActions, [a.id]: false });
+      mutate();
+    } else {
       const errorText = await res.text();
       alert(errorText || 'Failed to approve');
     }
   }
+
+  const rejectApproval = async (a:any) => {
+    if (!comment[a.id] || comment[a.id].trim() === '') {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+    const res = await fetch('/api/approvals/reject', { 
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify({ 
+        resourceType:a.resourceType, 
+        resourceId:a.resourceId, 
+        comment: comment[a.id] 
+      }) 
+    });
+    if (res.status === 401) {
+      alert('Your session has expired. Please log in again.');
+      window.location.href = '/login';
+      return;
+    }
+    if (res.ok) {
+      setComment({ ...comment, [a.id]: '' });
+      setShowActions({ ...showActions, [a.id]: false });
+      mutate();
+    } else {
+      const errorText = await res.text();
+      alert(errorText || 'Failed to reject');
+    }
+  }
   return (
     <div className="grid gap-4">
-      <h1 className="text-2xl font-semibold">Approvals</h1>
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <h1 className="text-2xl font-semibold">Approvals</h1>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+            onClick={() => setFilter('all')}
+          >
+            All
+          </button>
+          <button
+            className={`filter-btn ${filter === 'SUBMITTED' ? 'active' : ''}`}
+            onClick={() => setFilter('SUBMITTED')}
+          >
+            Pending
+          </button>
+          <button
+            className={`filter-btn ${filter === 'APPROVED' ? 'active' : ''}`}
+            onClick={() => setFilter('APPROVED')}
+          >
+            Approved
+          </button>
+          <button
+            className={`filter-btn ${filter === 'REJECTED' ? 'active' : ''}`}
+            onClick={() => setFilter('REJECTED')}
+          >
+            Rejected
+          </button>
+        </div>
+      </div>
       <div className="grid gap-3">
-        {(data?.list||[]).map((a:any)=>(
-          <div key={a.id} className="card flex justify-between items-center">
-            <div>
-              <div className="font-semibold">{a.resourceType} #{a.resourceId}</div>
-              <div className="text-sm">Action: {a.action} · Status: {a.status}</div>
-            </div>
-            {a.status==='SUBMITTED' && <button className="btn" onClick={()=>approve(a)}>Approve</button>}
+        {filteredList.length === 0 ? (
+          <div className="card text-center py-8">
+            <p className="text-gray-500">No approvals found for the selected filter.</p>
           </div>
-        ))}
+        ) : (
+          filteredList.map((a:any)=>(
+          <div key={a.id} className="card">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="font-semibold text-lg">{a.resourceType} #{a.resourceId}</div>
+                <div className="text-sm text-gray-600 mb-2">
+                  Action: {a.action} · Status: {a.status}
+                  {a.status === 'SUBMITTED' && !a.approver1 && (
+                    <span className="ml-2 px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
+                      ⏳ Waiting for approval
+                    </span>
+                  )}
+                  {a.status === 'APPROVED' && (
+                    <span className="ml-2 px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
+                      ✓ Approved{a.resourceType === 'notice' || a.resourceType === 'sermon' ? ' and published' : a.resourceType === 'booking' ? ' (pending payment)' : ''}
+                    </span>
+                  )}
+                  {a.approver1 && (
+                    <div className="mt-1 text-xs text-gray-500">
+                      ✓ First approval by {a.approver1.name || a.approver1.email}
+                      {a.comment1 && `: "${a.comment1}"`}
+                    </div>
+                  )}
+                  {a.approver2 && (
+                    <div className="mt-1 text-xs text-gray-500">
+                      ✓ Second approval by {a.approver2.name || a.approver2.email}
+                      {a.comment2 && `: "${a.comment2}"`}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Notice Details */}
+                {a.noticeDetails && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="mb-3">
+                      <div className="font-semibold text-base mb-1">{a.noticeDetails.title}</div>
+                      <div className="text-sm text-gray-600">
+                        Week of: {new Date(a.noticeDetails.weekOf).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </div>
+                    </div>
+                    <div 
+                      className="notice-content text-sm"
+                      dangerouslySetInnerHTML={{ __html: a.noticeDetails.bodyHtml }}
+                      style={{
+                        lineHeight: '1.6',
+                        color: 'rgb(55, 65, 81)',
+                        maxWidth: '100%'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Booking Details */}
+                {a.bookingDetails && (
+                  <div className="mt-2 text-sm space-y-1">
+                    <div><strong>Booking Ref:</strong> {a.bookingDetails.bookingRef}</div>
+                    <div><strong>Requester:</strong> {a.bookingDetails.requesterName} ({a.bookingDetails.email})</div>
+                    <div><strong>Hall:</strong> {a.bookingDetails.hall}</div>
+                    <div><strong>Date:</strong> {new Date(a.bookingDetails.date).toLocaleDateString()}</div>
+                    <div><strong>Time:</strong> {a.bookingDetails.startTime} - {a.bookingDetails.endTime}</div>
+                    <div><strong>Purpose:</strong> {a.bookingDetails.purpose}</div>
+                  </div>
+                )}
+
+                {/* Sermon Details */}
+                {a.sermonDetails && (
+                  <div className="mt-2 text-sm space-y-1">
+                    <div><strong>Title:</strong> {a.sermonDetails.title}</div>
+                    <div><strong>Speaker:</strong> {a.sermonDetails.speaker}</div>
+                    <div><strong>Date:</strong> {new Date(a.sermonDetails.date).toLocaleDateString()}</div>
+                    <div><strong>Link:</strong> <a href={a.sermonDetails.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{a.sermonDetails.link}</a></div>
+                  </div>
+                )}
+
+                {/* Asset Details */}
+                {a.assetDetails && (
+                  <div className="mt-2 text-sm space-y-1">
+                    <div><strong>Reference:</strong> {a.assetDetails.reference}</div>
+                    <div><strong>Value:</strong> {a.assetDetails.value}</div>
+                    <div><strong>Quantity:</strong> {a.assetDetails.quantity}</div>
+                    <div><strong>Category:</strong> {a.assetDetails.labelCategory}</div>
+                    {a.assetDetails.notes && <div><strong>Notes:</strong> {a.assetDetails.notes}</div>}
+                  </div>
+                )}
+              </div>
+              {a.status==='SUBMITTED' && (
+                <div className="ml-4 flex flex-col gap-2 min-w-[200px]">
+                  {!showActions[a.id] ? (
+                    <button className="btn" onClick={() => setShowActions({ ...showActions, [a.id]: true })}>
+                      Review & Approve
+                    </button>
+                  ) : (
+                    <>
+                      <textarea
+                        className="input text-sm"
+                        rows={3}
+                        placeholder="Add a comment (optional for approval, required for rejection)"
+                        value={comment[a.id] || ''}
+                        onChange={(e) => setComment({ ...comment, [a.id]: e.target.value })}
+                      />
+                      <div className="flex gap-2">
+                        <button 
+                          className="btn flex-1" 
+                          onClick={() => approve(a)}
+                          style={{ background: 'linear-gradient(135deg, rgb(34, 197, 94), rgb(22, 163, 74))' }}
+                        >
+                          Approve
+                        </button>
+                        <button 
+                          className="btn flex-1" 
+                          onClick={() => rejectApproval(a)}
+                          style={{ background: 'linear-gradient(135deg, rgb(239, 68, 68), rgb(220, 38, 38))' }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                      <button 
+                        className="btn-secondary text-sm" 
+                        onClick={() => {
+                          setShowActions({ ...showActions, [a.id]: false });
+                          setComment({ ...comment, [a.id]: '' });
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))
+        )}
       </div>
     </div>
   );

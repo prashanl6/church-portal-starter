@@ -1,6 +1,7 @@
 'use client';
 import useSWR from 'swr';
 import { useState } from 'react';
+import RichTextEditor from '@/components/RichTextEditor';
 
 const fetcher = (url:string) => fetch(url).then(r=>r.json());
 
@@ -75,13 +76,11 @@ export default function NoticesAdminPage() {
           />
         </div>
         <div>
-          <label className="label">Body (HTML)</label>
-          <textarea
-            className="input"
-            rows={6}
-            placeholder="Enter HTML content for the notice"
+          <label className="label">Body Content</label>
+          <RichTextEditor
             value={form.bodyHtml}
-            onChange={e => setForm({ ...form, bodyHtml: e.target.value })}
+            onChange={(value) => setForm({ ...form, bodyHtml: value })}
+            placeholder="Enter notice content. Use the toolbar to format text with bold, italic, underline, colors, and more..."
           />
         </div>
         <button className="btn w-fit">Submit for Approval</button>
@@ -95,9 +94,19 @@ export default function NoticesAdminPage() {
           ) : (
             (data?.list || []).map((n: any) => (
               <div key={n.id} className="card flex justify-between items-start">
-                <div>
+                <div className="flex-1">
                   <div className="font-semibold">{n.title}</div>
                   <div className="text-sm text-gray-600">Week of {new Date(n.weekOf).toLocaleDateString()}</div>
+                  {n.status === 'submitted' && (
+                    <div className="text-xs text-blue-600 mt-1">
+                      ℹ️ This notice is waiting for approval before it will appear on the public notices page
+                    </div>
+                  )}
+                  {n.status === 'published' && (
+                    <div className="text-xs text-green-600 mt-1">
+                      ✓ Published and visible on the public notices page
+                    </div>
+                  )}
                 </div>
                 <span className={`px-2 py-1 rounded text-sm font-medium ${getStatusBadge(n.status)}`}>
                   {n.status}

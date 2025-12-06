@@ -1,5 +1,25 @@
 import { prisma } from './prisma';
 import { fetchFacebookViews } from './facebook';
+import bcrypt from 'bcryptjs';
+
+// Get or create a system user for guest submissions (like bookings)
+export async function getOrCreateSystemUser() {
+  const systemEmail = 'system@church.local';
+  let systemUser = await prisma.user.findUnique({ where: { email: systemEmail } });
+  if (!systemUser) {
+    const hash = await bcrypt.hash('system', 10);
+    systemUser = await prisma.user.create({
+      data: {
+        name: 'System User',
+        email: systemEmail,
+        passwordHash: hash,
+        role: 'guest',
+        status: 'active'
+      }
+    });
+  }
+  return systemUser;
+}
 
 export async function submitApproval(resourceType: string, resourceId: number, action: string, submitterId: number) {
   return prisma.approval.create({
@@ -12,18 +32,32 @@ export async function approve(resourceType: string, resourceId: number, approver
   if (!approval) throw new Error('No pending approval');
   if (!approval.approver1Id) {
     if (approval.submitterId === approverId) throw new Error('Submitter cannot approve');
-    return prisma.approval.update({ where: { id: approval.id }, data: { approver1Id: approverId, comment1: comment } });
-  }
-  if (!approval.approver2Id) {
-    if (approval.submitterId === approverId || approval.approver1Id === approverId) throw new Error('Approver must be distinct');
-    const updated = await prisma.approval.update({ where: { id: approval.id }, data: { approver2Id: approverId, comment2: comment, status: 'APPROVED' } });
     
-    // Publish the resource when approval is complete
+    // For notices, sermons, and assets, single approval is sufficient - approve immediately
     if (approval.action === 'publish') {
       if (approval.resourceType === 'notice') {
+        const updated = await prisma.approval.update({ 
+          where: { id: approval.id }, 
+          data: { 
+            approver1Id: approverId, 
+            comment1: comment,
+            status: 'APPROVED' 
+          } 
+        });
         await prisma.notice.update({ where: { id: approval.resourceId }, data: { status: 'published' } });
+        return updated;
       }
+      
       if (approval.resourceType === 'sermon') {
+        const updated = await prisma.approval.update({ 
+          where: { id: approval.id }, 
+          data: { 
+            approver1Id: approverId, 
+            comment1: comment,
+            status: 'APPROVED' 
+          } 
+        });
+        
         // Try to fetch views from Facebook link when publishing
         const sermon = await prisma.sermon.findUnique({ where: { id: approval.resourceId } });
         let viewsUpdate: number | undefined = undefined;
@@ -35,9 +69,54 @@ export async function approve(resourceType: string, resourceId: number, approver
             // ignore facebook fetch errors
           }
         }
-        await prisma.sermon.update({ where: { id: approval.resourceId }, data: { status: 'published', ...(viewsUpdate !== undefined ? { views: viewsUpdate } : {}) } });
+        await prisma.sermon.update({ 
+          where: { id: approval.resourceId }, 
+          data: { 
+            status: 'published', 
+            ...(viewsUpdate !== undefined ? { views: viewsUpdate } : {}) 
+          } 
+        });
+        return updated;
       }
     }
+    
+    // For assets (action: 'create'), single approval is sufficient
+    if (approval.resourceType === 'asset' && approval.action === 'create') {
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      // Assets are already created with status 'active', so no status change needed
+      return updated;
+    }
+    
+    // For bookings (action: 'approve'), single approval is sufficient
+    if (approval.resourceType === 'booking' && approval.action === 'approve') {
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      await prisma.booking.update({ where: { id: approval.resourceId }, data: { status: 'APPROVED_PENDING_PAYMENT' } });
+      return updated;
+    }
+    
+    // For any other resource types, still require dual approval (fallback)
+    return prisma.approval.update({ where: { id: approval.id }, data: { approver1Id: approverId, comment1: comment } });
+  }
+  if (!approval.approver2Id) {
+    if (approval.submitterId === approverId || approval.approver1Id === approverId) throw new Error('Approver must be distinct');
+    const updated = await prisma.approval.update({ where: { id: approval.id }, data: { approver2Id: approverId, comment2: comment, status: 'APPROVED' } });
+    
+    // This section is only reached for resources that still require dual approval
+    // (Currently, all resources use single approval, so this is a fallback for future resources)
     
     return updated;
   }
