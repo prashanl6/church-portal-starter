@@ -38,7 +38,13 @@ export async function POST(req: Request) {
     let date: Date | null = null;
     if (dateStr) {
       const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) date = d;
+      if (!isNaN(d.getTime())) {
+        date = d;
+      } else {
+        return NextResponse.json({ 
+          error: 'Invalid date format. Please select a valid date.' 
+        }, { status: 400 });
+      }
     }
 
     if (!title || !speaker || !link || !date) {
@@ -64,7 +70,8 @@ export async function POST(req: Request) {
     }
 
     // Prepare dateOnly (UTC midnight) for DB-level uniqueness
-    const dateOnly = new Date(start);
+    // Ensure dateOnly is set to UTC midnight to match the unique constraint
+    const dateOnly = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0, 0));
 
     let created;
     try {
@@ -87,8 +94,19 @@ export async function POST(req: Request) {
         }, { status: 409 });
       }
       console.error('Database error creating sermon:', dbError);
+      console.error('Error details:', {
+        code: dbError.code,
+        message: dbError.message,
+        meta: dbError.meta
+      });
+      // Return more specific error message for debugging
+      const errorMessage = dbError.message || dbError.toString() || 'Failed to create sermon';
       return NextResponse.json({ 
-        error: 'Failed to create sermon. Please try again.' 
+        error: errorMessage.includes('dateOnly') || errorMessage.includes('unique')
+          ? 'A sermon for this date already exists'
+          : errorMessage.includes('required') || errorMessage.includes('NOT NULL')
+          ? 'Missing required fields: ' + errorMessage
+          : `Database error: ${errorMessage}`
       }, { status: 500 });
     }
 

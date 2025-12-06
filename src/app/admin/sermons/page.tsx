@@ -39,6 +39,7 @@ export default function AdminSermonsPage() {
       const res = await fetch('/api/admin/sermons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ title, speaker, theme, link, date: weekOf, dateIso: weekOf })
       });
       if (res.status === 401 || res.status === 403) {

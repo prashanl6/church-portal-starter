@@ -11,9 +11,9 @@ export async function fetchFacebookViews(link: string): Promise<number | null> {
   try {
     // Use the Graph API to fetch engagement for a URL. This is a best-effort approach.
     const url = `https://graph.facebook.com/?id=${encodeURIComponent(link)}&fields=engagement&access_token=${encodeURIComponent(token)}`;
-    const res = await fetch(url, { timeout: 5000 });
+    const res = await fetch(url);
     if (!res.ok) return null;
-    const json = await res.json();
+    const json = await res.json() as any;
     // engagement may contain reaction_count, comment_count, share_count
     const engagement = json?.engagement;
     if (!engagement) return null;
