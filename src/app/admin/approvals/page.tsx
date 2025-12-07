@@ -122,7 +122,13 @@ export default function ApprovalsPage() {
                   )}
                   {a.status === 'APPROVED' && (
                     <span className="ml-2 px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
-                      ✓ Approved{a.resourceType === 'notice' || a.resourceType === 'sermon' ? ' and published' : a.resourceType === 'booking' ? ' (pending payment)' : a.resourceType === 'asset' && a.action === 'delete' ? ' and deleted' : ''}
+                      ✓ Approved{
+                        a.resourceType === 'notice' && a.action === 'publish' ? ' and published' :
+                        a.resourceType === 'sermon' && a.action === 'publish' ? ' and published' :
+                        a.resourceType === 'booking' ? ' (pending payment)' :
+                        (a.resourceType === 'asset' || a.resourceType === 'notice' || a.resourceType === 'sermon') && a.action === 'delete' ? ' and deleted' :
+                        ''
+                      }
                     </span>
                   )}
                   {a.approver1 && (
@@ -142,25 +148,40 @@ export default function ApprovalsPage() {
                 {/* Notice Details */}
                 {a.noticeDetails && (
                   <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="mb-3">
-                      <div className="font-semibold text-base mb-1">{a.noticeDetails.title}</div>
-                      <div className="text-sm text-gray-600">
-                        Week of: {new Date(a.noticeDetails.weekOf).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}
+                    {a.action === 'delete' && !a.noticeDetails.deleted && (
+                      <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="font-semibold text-red-800">⚠️ Delete Request</div>
+                        <div className="text-xs text-red-700 mt-1">This notice will be permanently deleted if approved.</div>
                       </div>
-                    </div>
-                    <div 
-                      className="notice-content text-sm"
-                      dangerouslySetInnerHTML={{ __html: a.noticeDetails.bodyHtml }}
-                      style={{
-                        lineHeight: '1.6',
-                        color: 'rgb(55, 65, 81)',
-                        maxWidth: '100%'
-                      }}
-                    />
+                    )}
+                    {a.noticeDetails.deleted ? (
+                      <div className="mb-2 p-3 bg-gray-100 border border-gray-300 rounded-lg">
+                        <div className="font-semibold text-gray-700">Notice has been deleted</div>
+                        <div className="text-xs text-gray-600 mt-1">Title: {a.noticeDetails.title}</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mb-3">
+                          <div className="font-semibold text-base mb-1">{a.noticeDetails.title}</div>
+                          <div className="text-sm text-gray-600">
+                            Week of: {new Date(a.noticeDetails.weekOf).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                        </div>
+                        <div 
+                          className="notice-content text-sm"
+                          dangerouslySetInnerHTML={{ __html: a.noticeDetails.bodyHtml }}
+                          style={{
+                            lineHeight: '1.6',
+                            color: 'rgb(55, 65, 81)',
+                            maxWidth: '100%'
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -179,10 +200,26 @@ export default function ApprovalsPage() {
                 {/* Sermon Details */}
                 {a.sermonDetails && (
                   <div className="mt-2 text-sm space-y-1">
-                    <div><strong>Title:</strong> {a.sermonDetails.title}</div>
-                    <div><strong>Speaker:</strong> {a.sermonDetails.speaker}</div>
-                    <div><strong>Date:</strong> {new Date(a.sermonDetails.date).toLocaleDateString()}</div>
-                    <div><strong>Link:</strong> <a href={a.sermonDetails.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{a.sermonDetails.link}</a></div>
+                    {a.action === 'delete' && !a.sermonDetails.deleted && (
+                      <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="font-semibold text-red-800">⚠️ Delete Request</div>
+                        <div className="text-xs text-red-700 mt-1">This sermon will be permanently deleted if approved.</div>
+                      </div>
+                    )}
+                    {a.sermonDetails.deleted ? (
+                      <div className="mb-2 p-3 bg-gray-100 border border-gray-300 rounded-lg">
+                        <div className="font-semibold text-gray-700">Sermon has been deleted</div>
+                        <div className="text-xs text-gray-600 mt-1">Title: {a.sermonDetails.title}</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div><strong>Title:</strong> {a.sermonDetails.title}</div>
+                        <div><strong>Speaker:</strong> {a.sermonDetails.speaker}</div>
+                        <div><strong>Date:</strong> {new Date(a.sermonDetails.date).toLocaleDateString()}</div>
+                        <div><strong>Link:</strong> <a href={a.sermonDetails.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{a.sermonDetails.link}</a></div>
+                        <div><strong>Status:</strong> {a.sermonDetails.status}</div>
+                      </>
+                    )}
                   </div>
                 )}
 

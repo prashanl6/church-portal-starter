@@ -158,6 +158,50 @@ export async function approve(resourceType: string, resourceId: number, approver
       return updated;
     }
     
+    // For notice deletions, single approval is sufficient - delete the notice when approved
+    if (approval.resourceType === 'notice' && approval.action === 'delete') {
+      const notice = await prisma.notice.findUnique({ where: { id: approval.resourceId } });
+      if (!notice) {
+        throw new Error('Notice not found');
+      }
+      
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      
+      // Delete the notice after approval
+      await prisma.notice.delete({ where: { id: approval.resourceId } });
+      
+      return updated;
+    }
+    
+    // For sermon deletions, single approval is sufficient - delete the sermon when approved
+    if (approval.resourceType === 'sermon' && approval.action === 'delete') {
+      const sermon = await prisma.sermon.findUnique({ where: { id: approval.resourceId } });
+      if (!sermon) {
+        throw new Error('Sermon not found');
+      }
+      
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      
+      // Delete the sermon after approval
+      await prisma.sermon.delete({ where: { id: approval.resourceId } });
+      
+      return updated;
+    }
+    
     // For bookings (action: 'approve'), single approval is sufficient
     if (approval.resourceType === 'booking' && approval.action === 'approve') {
       const updated = await prisma.approval.update({ 

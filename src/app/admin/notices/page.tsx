@@ -1,12 +1,8 @@
 'use client';
-import useSWR from 'swr';
 import { useState } from 'react';
 import RichTextEditor from '@/components/RichTextEditor';
 
-const fetcher = (url:string) => fetch(url).then(r=>r.json());
-
 export default function NoticesAdminPage() {
-  const { data, mutate } = useSWR('/api/admin/notices', fetcher);
   const [form, setForm] = useState({
     title: '',
     bodyHtml: '',
@@ -35,21 +31,10 @@ export default function NoticesAdminPage() {
     if (res.ok) {
       alert('Notice submitted for approval');
       setForm({ title: '', bodyHtml: '', weekOf: new Date().toISOString().split('T')[0] });
-      mutate();
     } else {
       const errorText = await res.text();
       alert(errorText || 'Failed to submit notice');
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const colors: any = {
-      'submitted': 'bg-yellow-100 text-yellow-800',
-      'published': 'bg-green-100 text-green-800',
-      'rejected': 'bg-red-100 text-red-800',
-      'draft': 'bg-gray-100 text-gray-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   return (
@@ -85,37 +70,6 @@ export default function NoticesAdminPage() {
         </div>
         <button className="btn w-fit">Submit for Approval</button>
       </form>
-
-      <div>
-        <h2 className="text-lg font-semibold mb-3">All Notices</h2>
-        <div className="grid gap-2">
-          {(data?.list || []).length === 0 ? (
-            <p className="text-gray-500">No notices yet.</p>
-          ) : (
-            (data?.list || []).map((n: any) => (
-              <div key={n.id} className="card flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="font-semibold">{n.title}</div>
-                  <div className="text-sm text-gray-600">Week of {new Date(n.weekOf).toLocaleDateString()}</div>
-                  {n.status === 'submitted' && (
-                    <div className="text-xs text-blue-600 mt-1">
-                      ℹ️ This notice is waiting for approval before it will appear on the public notices page
-                    </div>
-                  )}
-                  {n.status === 'published' && (
-                    <div className="text-xs text-green-600 mt-1">
-                      ✓ Published and visible on the public notices page
-                    </div>
-                  )}
-                </div>
-                <span className={`px-2 py-1 rounded text-sm font-medium ${getStatusBadge(n.status)}`}>
-                  {n.status}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 }

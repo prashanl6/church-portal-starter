@@ -411,25 +411,34 @@ body.admin-mode .user-logout-btn:active {
 }
 
 body.admin-mode .filter-btn {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.8);
+  color: rgb(99, 102, 241);
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 body.admin-mode .filter-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
+  background-color: rgb(255, 255, 255);
+  border-color: rgb(255, 255, 255);
+  color: rgb(79, 70, 229);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
 body.admin-mode .filter-btn.active {
-  background-color: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.5);
-  color: rgb(255, 255, 255);
+  background: linear-gradient(135deg, rgb(251, 191, 36), rgb(245, 158, 11));
+  border-color: rgb(251, 191, 36);
+  color: rgb(15, 23, 42);
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.5);
 }
 
 body.admin-mode .filter-btn.active:hover {
-  background-color: rgba(255, 255, 255, 0.4);
-  border-color: rgba(255, 255, 255, 0.6);
+  background: linear-gradient(135deg, rgb(252, 211, 77), rgb(251, 191, 36));
+  border-color: rgb(252, 211, 77);
+  box-shadow: 0 6px 16px rgba(251, 191, 36, 0.6);
+  transform: translateY(-1px);
 }
 
 /* Generic sections */

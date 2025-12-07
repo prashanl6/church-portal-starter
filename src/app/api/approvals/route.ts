@@ -32,6 +32,7 @@ export async function GET() {
     }
     if (approval.resourceType === 'notice') {
       const notice = await prisma.notice.findUnique({ where: { id: approval.resourceId } });
+      // Notice might be null if it was already deleted (for delete approvals that were approved)
       return {
         ...approval,
         noticeDetails: notice ? {
@@ -39,11 +40,16 @@ export async function GET() {
           bodyHtml: notice.bodyHtml,
           weekOf: notice.weekOf,
           status: notice.status
-        } : null
+        } : (approval.action === 'delete' ? {
+          // For approved deletions, notice no longer exists, but we can show it was deleted
+          title: 'Notice #' + approval.resourceId,
+          deleted: true
+        } : null)
       };
     }
     if (approval.resourceType === 'sermon') {
       const sermon = await prisma.sermon.findUnique({ where: { id: approval.resourceId } });
+      // Sermon might be null if it was already deleted (for delete approvals that were approved)
       return {
         ...approval,
         sermonDetails: sermon ? {
@@ -52,7 +58,11 @@ export async function GET() {
           link: sermon.link,
           date: sermon.date,
           status: sermon.status
-        } : null
+        } : (approval.action === 'delete' ? {
+          // For approved deletions, sermon no longer exists, but we can show it was deleted
+          title: 'Sermon #' + approval.resourceId,
+          deleted: true
+        } : null)
       };
     }
     if (approval.resourceType === 'asset') {
