@@ -74,7 +74,7 @@ export default function ApprovalsPage() {
   return (
     <div className="grid gap-4">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-2xl font-semibold">Approvals</h1>
+      <h1 className="text-2xl font-semibold">Approvals</h1>
         <div className="flex gap-2 flex-wrap">
           <button
             className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
@@ -125,8 +125,9 @@ export default function ApprovalsPage() {
                       ✓ Approved{
                         a.resourceType === 'notice' && a.action === 'publish' ? ' and published' :
                         a.resourceType === 'sermon' && a.action === 'publish' ? ' and published' :
+                        a.resourceType === 'process' && a.action === 'publish' ? ' and published' :
                         a.resourceType === 'booking' ? ' (pending payment)' :
-                        (a.resourceType === 'asset' || a.resourceType === 'notice' || a.resourceType === 'sermon') && a.action === 'delete' ? ' and deleted' :
+                        (a.resourceType === 'asset' || a.resourceType === 'notice' || a.resourceType === 'sermon' || a.resourceType === 'process') && a.action === 'delete' ? ' and deleted' :
                         ''
                       }
                     </span>
@@ -271,6 +272,73 @@ export default function ApprovalsPage() {
                         <div><strong>Quantity:</strong> {a.assetDetails.quantity.toLocaleString()}</div>
                         <div><strong>Category:</strong> {a.assetDetails.labelCategory}</div>
                         {a.assetDetails.notes && <div><strong>Notes:</strong> {a.assetDetails.notes}</div>}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Process Details */}
+                {a.processDetails && (
+                  <div className="mt-2 text-sm space-y-1">
+                    {a.action === 'delete' && !a.processDetails.deleted && (
+                      <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="font-semibold text-red-800">⚠️ Delete Request</div>
+                        <div className="text-xs text-red-700 mt-1">This process document will be permanently deleted if approved.</div>
+                      </div>
+                    )}
+                    {a.action === 'update' && a.processDetails.proposedChanges && (
+                      <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="font-semibold text-blue-800">📝 Update Request</div>
+                        <div className="text-xs text-blue-700 mt-1">The following changes will be applied if approved:</div>
+                      </div>
+                    )}
+                    {a.processDetails.deleted ? (
+                      <div className="mb-2 p-3 bg-gray-100 border border-gray-300 rounded-lg">
+                        <div className="font-semibold text-gray-700">Process document has been deleted</div>
+                        <div className="text-xs text-gray-600 mt-1">Title: {a.processDetails.title}</div>
+                      </div>
+                    ) : a.action === 'update' && a.processDetails.proposedChanges ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="font-semibold text-xs text-gray-500 mb-2">Current Values</div>
+                          <div><strong>Title:</strong> {a.processDetails.title}</div>
+                          <div><strong>Version:</strong> {a.processDetails.version}</div>
+                          <div className="mt-2">
+                            <strong>Content:</strong>
+                            <div 
+                              className="notice-content text-xs mt-1"
+                              dangerouslySetInnerHTML={{ __html: a.processDetails.contentHtml.substring(0, 200) + '...' }}
+                              style={{ maxHeight: '100px', overflow: 'hidden' }}
+                            />
+                          </div>
+                        </div>
+            <div>
+                          <div className="font-semibold text-xs text-blue-600 mb-2">Proposed Changes</div>
+                          <div><strong>Title:</strong> {a.processDetails.proposedChanges.title}</div>
+                          <div><strong>Version:</strong> {a.processDetails.version + 1}</div>
+                          <div className="mt-2">
+                            <strong>Content:</strong>
+                            <div 
+                              className="notice-content text-xs mt-1"
+                              dangerouslySetInnerHTML={{ __html: a.processDetails.proposedChanges.contentHtml.substring(0, 200) + '...' }}
+                              style={{ maxHeight: '100px', overflow: 'hidden' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div><strong>Title:</strong> {a.processDetails.title}</div>
+                        <div><strong>Version:</strong> {a.processDetails.version}</div>
+                        <div><strong>Status:</strong> {a.processDetails.status}</div>
+                        <div className="mt-2">
+                          <strong>Content:</strong>
+                          <div 
+                            className="notice-content text-sm mt-1"
+                            dangerouslySetInnerHTML={{ __html: a.processDetails.contentHtml }}
+                            style={{ maxHeight: '300px', overflow: 'auto' }}
+                          />
+                        </div>
                       </>
                     )}
                   </div>

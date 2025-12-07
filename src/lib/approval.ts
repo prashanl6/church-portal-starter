@@ -202,6 +202,82 @@ export async function approve(resourceType: string, resourceId: number, approver
       return updated;
     }
     
+    // For process documents (action: 'publish'), single approval is sufficient - publish immediately
+    if (approval.resourceType === 'process' && approval.action === 'publish') {
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      await prisma.processDoc.update({ where: { id: approval.resourceId }, data: { status: 'published' } });
+      return updated;
+    }
+    
+    // For process updates, parse the update data from comment1 and update the original process
+    if (approval.resourceType === 'process' && approval.action === 'update') {
+      let updateData: any = {};
+      try {
+        // Parse the update data stored in comment1
+        if (approval.comment1) {
+          updateData = JSON.parse(approval.comment1);
+        }
+      } catch (e) {
+        throw new Error('Invalid update data in approval');
+      }
+      
+      const process = await prisma.processDoc.findUnique({ where: { id: approval.resourceId } });
+      if (!process) {
+        throw new Error('Process not found');
+      }
+      
+      // Update the original process with the new data
+      await prisma.processDoc.update({
+        where: { id: approval.resourceId },
+        data: {
+          title: updateData.title,
+          contentHtml: updateData.contentHtml,
+          version: process.version + 1
+        }
+      });
+      
+      // Update approval with approver comment (replacing the JSON data)
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment || 'Approved', // Replace JSON with approver's comment
+          status: 'APPROVED' 
+        } 
+      });
+      
+      return updated;
+    }
+    
+    // For process deletions, single approval is sufficient - delete the process when approved
+    if (approval.resourceType === 'process' && approval.action === 'delete') {
+      const process = await prisma.processDoc.findUnique({ where: { id: approval.resourceId } });
+      if (!process) {
+        throw new Error('Process not found');
+      }
+      
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      
+      // Delete the process after approval
+      await prisma.processDoc.delete({ where: { id: approval.resourceId } });
+      
+      return updated;
+    }
+    
     // For bookings (action: 'approve'), single approval is sufficient
     if (approval.resourceType === 'booking' && approval.action === 'approve') {
       const updated = await prisma.approval.update({ 

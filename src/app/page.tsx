@@ -29,7 +29,7 @@ export default function Home() {
             marginTop: 0,
             fontSize: 'clamp(2rem, 5vw, 3rem)',
             lineHeight: 1.2
-          }}>Welcome to Church Portal</h1>
+          }}>Welcome to Mount Lavinia Methodist Church</h1>
           <p className="page-subtitle" style={{
             marginBottom: '2.5rem',
             fontSize: '1.125rem',

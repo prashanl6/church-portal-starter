@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
+import { requireRole, getUserFromCookie } from '@/lib/auth';
+import { submitApproval } from '@/lib/approval';
+import { audit } from '@/lib/audit';
 
 export async function GET() {
   const u = requireRole(['admin', 'staff']);
@@ -21,9 +23,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const u = requireRole(['admin', 'staff']);
+  const u = getUserFromCookie();
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
+  }
+  if (u.role !== 'admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
   }
 
   try {
@@ -39,9 +44,12 @@ export async function POST(req: Request) {
         title,
         contentHtml,
         ownerUserId: u.id,
-        status: 'draft'
+        status: 'submitted'
       }
     });
+
+    await submitApproval('process', created.id, 'publish', u.id);
+    await audit(u.id, 'create_draft_process', 'process', created.id, null, created);
 
     return NextResponse.json({ ok: true, id: created.id });
   } catch (error: any) {

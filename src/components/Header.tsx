@@ -68,6 +68,7 @@ export default function Header() {
             <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/">Home</Link>
             <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/notices">Notices</Link>
             <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/sermons">Sermons</Link>
+            <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/processes">Processes</Link>
             <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/book-hall">Book Hall</Link>
             {isAdmin && (
               <Link className="app-nav-link admin-nav-admin" href="/admin">Admin</Link>
