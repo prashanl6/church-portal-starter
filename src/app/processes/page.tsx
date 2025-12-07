@@ -255,8 +255,13 @@ export default function ProcessesPage() {
                 </button>
                 <button
                   onClick={() => handleDelete(selectedProcess.id, selectedProcess.title)}
-                  className="btn"
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', backgroundColor: 'rgb(239, 68, 68)', color: 'white' }}
+                  className="btn btn-delete"
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    fontSize: '0.875rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
                   Delete
                 </button>
@@ -381,8 +386,13 @@ export default function ProcessesPage() {
                         e.stopPropagation();
                         handleDelete(process.id, process.title);
                       }}
-                      className="btn"
-                      style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', backgroundColor: 'rgb(239, 68, 68)', color: 'white' }}
+                      className="btn btn-delete"
+                      style={{ 
+                        padding: '0.5rem 1rem', 
+                        fontSize: '0.875rem',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
                     >
                       Delete
                     </button>

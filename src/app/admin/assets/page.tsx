@@ -387,8 +387,13 @@ export default function AssetsPage() {
                           )}
                           <button 
                             onClick={() => handleDelete(a.id, a.reference)}
-                            className="btn btn-sm"
-                            style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem', backgroundColor: 'rgb(239, 68, 68)', color: 'white' }}
+                            className="btn btn-sm btn-delete"
+                            style={{ 
+                              padding: '0.25rem 0.75rem', 
+                              fontSize: '0.875rem',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
                           >
                             Delete
                           </button>
@@ -475,8 +480,13 @@ export default function AssetsPage() {
                           {assetIds.length > 0 && (
                             <button 
                               onClick={handleDeleteSummed}
-                              className="btn btn-sm"
-                              style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem', backgroundColor: 'rgb(239, 68, 68)', color: 'white' }}
+                              className="btn btn-sm btn-delete"
+                              style={{ 
+                                padding: '0.25rem 0.75rem', 
+                                fontSize: '0.875rem',
+                                border: 'none',
+                                cursor: 'pointer'
+                              }}
                             >
                               Delete
                             </button>

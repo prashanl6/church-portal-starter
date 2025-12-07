@@ -279,6 +279,25 @@ body.admin-mode .btn:hover {
   box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
 }
 
+/* Delete buttons - always red, even in admin mode */
+.btn-delete,
+body.admin-mode .btn-delete {
+  background: rgb(239, 68, 68) !important;
+  background-color: rgb(239, 68, 68) !important;
+  background-image: none !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+  color: white !important;
+}
+
+.btn-delete:hover,
+body.admin-mode .btn-delete:hover {
+  background: rgb(220, 38, 38) !important;
+  background-color: rgb(220, 38, 38) !important;
+  background-image: none !important;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4) !important;
+  color: white !important;
+}
+
 body.admin-mode .btn-primary {
   background: linear-gradient(135deg, rgb(99, 102, 241), rgb(79, 70, 229));
   box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25);

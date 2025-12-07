@@ -151,13 +151,13 @@ export default function NoticesPage() {
                     alert('Failed to submit delete request');
                   }
                 }}
-                className="btn"
+                className="btn btn-delete"
                 style={{
-                  backgroundColor: 'rgb(239, 68, 68)',
-                  color: 'white',
                   padding: '0.5rem 1rem',
                   fontSize: '0.875rem',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  border: 'none',
+                  cursor: 'pointer'
                 }}
               >
                 Delete
@@ -294,13 +294,13 @@ export default function NoticesPage() {
                           alert('Failed to submit delete request');
                         }
                       }}
-                      className="btn"
+                      className="btn btn-delete"
                       style={{
-                        backgroundColor: 'rgb(239, 68, 68)',
-                        color: 'white',
                         padding: '0.5rem 1rem',
                         fontSize: '0.875rem',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        border: 'none',
+                        cursor: 'pointer'
                       }}
                     >
                       Delete
