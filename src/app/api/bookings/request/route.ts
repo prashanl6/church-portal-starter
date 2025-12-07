@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { submitApproval, getOrCreateSystemUser } from '@/lib/approval';
+import { sendBookingSubmissionEmail } from '@/lib/email';
 
 function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return aStart < bEnd && bStart < aEnd;
@@ -10,7 +11,14 @@ export async function POST(req: Request) {
   const { fullName, email, phone, purpose, date, startTime, endTime, hall } = await req.json();
   if (!purpose || !date || !startTime || !endTime) return new NextResponse('Missing fields', { status: 400 });
   const day = new Date(date);
-  const sameDay = await prisma.booking.findMany({ where: { hall, date: day, status: { in: ['REQUESTED','APPROVED_PENDING_PAYMENT','BOOKED_PAID'] } } });
+  // Only check against fully paid and approved bookings (BOOKED_PAID) for availability
+  const sameDay = await prisma.booking.findMany({ 
+    where: { 
+      hall, 
+      date: day, 
+      status: 'BOOKED_PAID' // Only check against confirmed, paid bookings
+    } 
+  });
   for (const b of sameDay) {
     if (overlaps(startTime, endTime, b.startTime, b.endTime)) return new NextResponse('Time slot unavailable', { status: 409 });
   }
@@ -24,6 +32,24 @@ export async function POST(req: Request) {
   } catch (approvalError: any) {
     console.error('Error creating approval for booking:', approvalError);
     // Don't fail the booking creation if approval creation fails
+  }
+  
+  // Send confirmation email to requester
+  try {
+    await sendBookingSubmissionEmail({
+      bookingRef: created.bookingRef,
+      requesterName: fullName,
+      email,
+      phone,
+      hall,
+      date: day.toISOString(),
+      startTime,
+      endTime,
+      purpose,
+    });
+  } catch (emailError: any) {
+    console.error('Error sending booking submission email:', emailError);
+    // Don't fail the booking creation if email fails
   }
   
   return NextResponse.json({ ok: true, bookingRef: created.bookingRef });

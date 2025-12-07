@@ -15,6 +15,7 @@ export async function GET() {
   const enrichedList = await Promise.all(list.map(async (approval) => {
     if (approval.resourceType === 'booking') {
       const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
+      // Booking might be null if it was already deleted (for delete approvals that were approved)
       return {
         ...approval,
         bookingDetails: booking ? {
@@ -26,8 +27,16 @@ export async function GET() {
           date: booking.date,
           startTime: booking.startTime,
           endTime: booking.endTime,
-          purpose: booking.purpose
-        } : null
+          purpose: booking.purpose,
+          status: booking.status,
+          amount: booking.amount,
+          paymentRef: booking.paymentRef,
+          slipUrl: booking.slipUrl
+        } : (approval.action === 'delete' ? {
+          // For approved deletions, booking no longer exists, but we can show it was deleted
+          bookingRef: 'Booking #' + approval.resourceId,
+          deleted: true
+        } : null)
       };
     }
     if (approval.resourceType === 'notice') {

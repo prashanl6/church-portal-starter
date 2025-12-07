@@ -19,7 +19,11 @@ export default function AuditLogsPage() {
                 <div className="flex-1">
                   <div className="font-semibold">{log.action}</div>
                   <div className="text-sm text-gray-600">
-                    {log.resourceType} #{log.resourceId} · Actor ID: {log.actorId}
+                    {log.resourceType} #{log.resourceId}
+                    {log.actor && ` · Actor: ${log.actor.name} (${log.actor.email})`}
+                    {!log.actor && ` · Actor ID: ${log.actorId}`}
+                    {log.requestor && ` · Requestor: ${log.requestor.name} (${log.requestor.email})`}
+                    {log.approver && ` · Approver: ${log.approver.name} (${log.approver.email})`}
                     {log.theme && ` · Theme: ${log.theme}`}
                   </div>
                   <div className="text-sm text-gray-500 mt-1">

@@ -8,11 +8,17 @@ export async function POST(req: Request) {
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }
+  
+  // For bookings, comment is mandatory
+  if (resourceType === 'booking' && (!comment || comment.trim() === '')) {
+    return NextResponse.json({ error: 'Rejection reason is required for booking rejections' }, { status: 400 });
+  }
+  
   try {
     const result = await reject(resourceType, Number(resourceId), u.id, comment || '');
     return NextResponse.json({ ok: true, result });
   } catch (e:any) {
-    return new NextResponse(e.message, { status: 400 });
+    return NextResponse.json({ error: e.message }, { status: 400 });
   }
 }
 

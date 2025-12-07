@@ -73,8 +73,14 @@ export default function ApprovalsPage() {
   }
 
   const rejectApproval = async (a:any) => {
+    // For bookings, comment is mandatory
+    const isBooking = a.resourceType === 'booking';
     if (!comment[a.id] || comment[a.id].trim() === '') {
-      alert('Please provide a reason for rejection');
+      if (isBooking) {
+        alert('Rejection reason is required for booking rejections');
+      } else {
+        alert('Please provide a reason for rejection');
+      }
       return;
     }
     const res = await fetch('/api/approvals/reject', { 
@@ -143,7 +149,7 @@ export default function ApprovalsPage() {
               <div className="flex-1">
                 <div className="font-semibold text-lg">{a.resourceType} #{a.resourceId}</div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Action: {a.action} · Status: {a.status}
+                  Action: {a.action === 'confirm_payment' ? 'Confirm Payment' : a.action === 'approve' ? 'Approve Booking' : a.action === 'delete' && a.resourceType === 'booking' ? 'Delete Booking' : a.action} · Status: {a.status}
                   {a.status === 'SUBMITTED' && !a.approver1 && (
                     <span className="ml-2 px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
                       ⏳ Waiting for approval
@@ -155,8 +161,9 @@ export default function ApprovalsPage() {
                         a.resourceType === 'notice' && a.action === 'publish' ? ' and published' :
                         a.resourceType === 'sermon' && a.action === 'publish' ? ' and published' :
                         a.resourceType === 'process' && a.action === 'publish' ? ' and published' :
-                        a.resourceType === 'booking' ? ' (pending payment)' :
-                        (a.resourceType === 'asset' || a.resourceType === 'notice' || a.resourceType === 'sermon' || a.resourceType === 'process') && a.action === 'delete' ? ' and deleted' :
+                        a.resourceType === 'booking' && a.action === 'approve' ? ' (pending payment)' :
+                        a.resourceType === 'booking' && a.action === 'confirm_payment' ? ' (payment confirmed)' :
+                        (a.resourceType === 'asset' || a.resourceType === 'notice' || a.resourceType === 'sermon' || a.resourceType === 'process' || a.resourceType === 'booking') && a.action === 'delete' ? ' and deleted' :
                         ''
                       }
                     </span>
@@ -217,13 +224,58 @@ export default function ApprovalsPage() {
 
                 {/* Booking Details */}
                 {a.bookingDetails && (
-                  <div className="mt-2 text-sm space-y-1">
-                    <div><strong>Booking Ref:</strong> {a.bookingDetails.bookingRef}</div>
-                    <div><strong>Requester:</strong> {a.bookingDetails.requesterName} ({a.bookingDetails.email})</div>
-                    <div><strong>Hall:</strong> {a.bookingDetails.hall}</div>
-                    <div><strong>Date:</strong> {new Date(a.bookingDetails.date).toLocaleDateString()}</div>
-                    <div><strong>Time:</strong> {a.bookingDetails.startTime} - {a.bookingDetails.endTime}</div>
-                    <div><strong>Purpose:</strong> {a.bookingDetails.purpose}</div>
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    {a.action === 'delete' && !a.bookingDetails.deleted && (
+                      <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="font-semibold text-red-800">⚠️ Delete Request</div>
+                        <div className="text-xs text-red-700 mt-1">This booking will be permanently deleted if approved.</div>
+                      </div>
+                    )}
+                    {a.action === 'confirm_payment' && (
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="font-semibold text-blue-800">💰 Payment Receipt Submitted</div>
+                        <div className="text-xs text-blue-700 mt-1">Review the payment receipt and confirm payment.</div>
+                      </div>
+                    )}
+                    {a.bookingDetails.deleted ? (
+                      <div className="mb-2 p-3 bg-gray-100 border border-gray-300 rounded-lg">
+                        <div className="font-semibold text-gray-700">Booking has been deleted</div>
+                        <div className="text-xs text-gray-600 mt-1">Booking Reference: {a.bookingDetails.bookingRef}</div>
+                      </div>
+                    ) : (
+                    <div className="text-sm space-y-1">
+                      <div><strong>Booking Ref:</strong> {a.bookingDetails.bookingRef}</div>
+                      <div><strong>Requester:</strong> {a.bookingDetails.requesterName} ({a.bookingDetails.email})</div>
+                      <div><strong>Hall:</strong> {a.bookingDetails.hall}</div>
+                      <div><strong>Date:</strong> {new Date(a.bookingDetails.date).toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}</div>
+                      <div><strong>Time:</strong> {a.bookingDetails.startTime} - {a.bookingDetails.endTime}</div>
+                      <div><strong>Purpose:</strong> {a.bookingDetails.purpose}</div>
+                      {a.action === 'confirm_payment' && a.bookingDetails.amount && (
+                        <div><strong>Amount:</strong> LKR {a.bookingDetails.amount.toLocaleString()}</div>
+                      )}
+                      {a.action === 'confirm_payment' && a.bookingDetails.paymentRef && (
+                        <div><strong>Payment Reference:</strong> {a.bookingDetails.paymentRef}</div>
+                      )}
+                      {a.action === 'confirm_payment' && a.bookingDetails.slipUrl && (
+                        <div className="mt-2">
+                          <strong>Receipt:</strong>{' '}
+                          <a 
+                            href={a.bookingDetails.slipUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            View Receipt
+                          </a>
+                        </div>
+                      )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -384,10 +436,17 @@ export default function ApprovalsPage() {
                       <textarea
                         className="input text-sm"
                         rows={3}
-                        placeholder="Add a comment (optional for approval, required for rejection)"
+                        placeholder={a.resourceType === 'booking' && a.action === 'approve' 
+                          ? "Add a comment (optional for approval, required for rejection)" 
+                          : "Add a comment (optional for approval, required for rejection)"}
                         value={comment[a.id] || ''}
                         onChange={(e) => setComment({ ...comment, [a.id]: e.target.value })}
                       />
+                      {a.resourceType === 'booking' && a.action === 'approve' && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          Note: Rejection reason is mandatory for booking rejections
+                        </p>
+                      )}
                       <div className="flex gap-2">
                         <button 
                           className="btn flex-1" 

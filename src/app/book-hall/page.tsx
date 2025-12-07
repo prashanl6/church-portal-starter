@@ -40,7 +40,7 @@ export default function BookHallPage() {
         </h2>
         {booked.length === 0 ? (
           <p style={{ color: 'rgb(100, 116, 139)', margin: 0 }}>
-            No bookings scheduled yet
+            No confirmed bookings scheduled
           </p>
         ) : (
           <ul style={{ 
@@ -51,29 +51,40 @@ export default function BookHallPage() {
             flexDirection: 'column',
             gap: '0.5rem'
           }}>
-            {booked.map((b, i) => (
-              <li 
-                key={i}
-                style={{
-                  padding: '0.75rem',
-                  backgroundColor: 'rgb(248, 250, 252)',
-                  borderRadius: '0.5rem',
-                  border: '1px solid rgb(226, 232, 240)'
-                }}
-              >
-                <span style={{ fontWeight: 500 }}>
-                  {new Date(b.date).toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </span>
-                <span style={{ color: 'rgb(71, 85, 105)', marginLeft: '0.5rem' }}>
-                  {b.startTime} - {b.endTime}
-                </span>
-              </li>
-            ))}
+            {booked
+              .filter((b) => {
+                // Filter out past dates on client side as well (in case of timezone issues)
+                const bookingDate = new Date(b.date);
+                return bookingDate >= new Date();
+              })
+              .map((b, i) => (
+                <li 
+                  key={i}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: 'rgb(248, 250, 252)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid rgb(226, 232, 240)'
+                  }}
+                >
+                  <span style={{ fontWeight: 500 }}>
+                    {new Date(b.date).toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </span>
+                  <span style={{ color: 'rgb(71, 85, 105)', marginLeft: '0.5rem' }}>
+                    {b.startTime} - {b.endTime}
+                  </span>
+                  {b.hall && (
+                    <span style={{ color: 'rgb(100, 116, 139)', marginLeft: '0.5rem', fontSize: '0.875rem' }}>
+                      ({b.hall})
+                    </span>
+                  )}
+                </li>
+              ))}
           </ul>
         )}
       </div>

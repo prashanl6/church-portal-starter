@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import { fetchFacebookViews } from './facebook';
 import bcrypt from 'bcryptjs';
+import { audit } from './audit';
 
 // Get or create a system user for guest submissions (like bookings)
 export async function getOrCreateSystemUser() {
@@ -45,6 +46,15 @@ export async function approve(resourceType: string, resourceId: number, approver
           } 
         });
         await prisma.notice.update({ where: { id: approval.resourceId }, data: { status: 'published' } });
+        
+        // Audit log with requestor and approver
+        await audit(approverId, 'approve_notice', 'notice', approval.resourceId, 
+          { status: 'draft' }, 
+          { status: 'published' },
+          approval.submitterId,
+          approverId
+        );
+        
         return updated;
       }
       
@@ -76,6 +86,15 @@ export async function approve(resourceType: string, resourceId: number, approver
             ...(viewsUpdate !== undefined ? { views: viewsUpdate } : {}) 
           } 
         });
+        
+        // Audit log with requestor and approver
+        await audit(approverId, 'approve_sermon', 'sermon', approval.resourceId,
+          { status: 'draft' },
+          { status: 'published', ...(viewsUpdate !== undefined ? { views: viewsUpdate } : {}) },
+          approval.submitterId,
+          approverId
+        );
+        
         return updated;
       }
     }
@@ -91,6 +110,15 @@ export async function approve(resourceType: string, resourceId: number, approver
         } 
       });
       // Assets are already created with status 'active', so no status change needed
+      
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_asset_create', 'asset', approval.resourceId,
+        null,
+        { action: 'create', status: 'approved' },
+        approval.submitterId,
+        approverId
+      );
+      
       return updated;
     }
     
@@ -155,6 +183,14 @@ export async function approve(resourceType: string, resourceId: number, approver
       // Delete the asset after approval
       await prisma.asset.delete({ where: { id: approval.resourceId } });
       
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_asset_delete', 'asset', approval.resourceId,
+        asset,
+        { action: 'delete', status: 'deleted' },
+        approval.submitterId,
+        approverId
+      );
+      
       return updated;
     }
     
@@ -176,6 +212,14 @@ export async function approve(resourceType: string, resourceId: number, approver
       
       // Delete the notice after approval
       await prisma.notice.delete({ where: { id: approval.resourceId } });
+      
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_notice_delete', 'notice', approval.resourceId,
+        notice,
+        { action: 'delete', status: 'deleted' },
+        approval.submitterId,
+        approverId
+      );
       
       return updated;
     }
@@ -199,6 +243,14 @@ export async function approve(resourceType: string, resourceId: number, approver
       // Delete the sermon after approval
       await prisma.sermon.delete({ where: { id: approval.resourceId } });
       
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_sermon_delete', 'sermon', approval.resourceId,
+        sermon,
+        { action: 'delete', status: 'deleted' },
+        approval.submitterId,
+        approverId
+      );
+      
       return updated;
     }
     
@@ -213,6 +265,15 @@ export async function approve(resourceType: string, resourceId: number, approver
         } 
       });
       await prisma.processDoc.update({ where: { id: approval.resourceId }, data: { status: 'published' } });
+      
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_process_create', 'process', approval.resourceId,
+        { status: 'submitted' },
+        { status: 'published' },
+        approval.submitterId,
+        approverId
+      );
+      
       return updated;
     }
     
@@ -253,6 +314,14 @@ export async function approve(resourceType: string, resourceId: number, approver
         } 
       });
       
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_asset_update', 'asset', approval.resourceId,
+        updateData,
+        { action: 'update', status: 'approved' },
+        approval.submitterId,
+        approverId
+      );
+      
       return updated;
     }
     
@@ -275,11 +344,74 @@ export async function approve(resourceType: string, resourceId: number, approver
       // Delete the process after approval
       await prisma.processDoc.delete({ where: { id: approval.resourceId } });
       
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_process_delete', 'process', approval.resourceId,
+        process,
+        { action: 'delete', status: 'deleted' },
+        approval.submitterId,
+        approverId
+      );
+      
+      return updated;
+    }
+    
+    // For booking payment confirmations (action: 'confirm_payment'), single approval is sufficient
+    if (approval.resourceType === 'booking' && approval.action === 'confirm_payment') {
+      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+      
+      if (!booking.slipUrl) {
+        throw new Error('No payment receipt uploaded');
+      }
+      
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      
+      // Update booking status to BOOKED_PAID
+      await prisma.booking.update({ 
+        where: { id: approval.resourceId }, 
+        data: { status: 'BOOKED_PAID' } 
+      });
+      
+      // Send payment confirmation email to requester
+      try {
+        const { sendBookingPaymentConfirmedEmail } = await import('@/lib/email');
+        await sendBookingPaymentConfirmedEmail({
+          bookingRef: booking.bookingRef,
+          requesterName: booking.requesterName,
+          email: booking.email,
+          phone: booking.phone,
+          hall: booking.hall,
+          date: booking.date.toISOString(),
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          purpose: booking.purpose,
+          amount: booking.amount || undefined,
+          paymentRef: booking.paymentRef || undefined,
+        });
+      } catch (emailError: any) {
+        console.error('Error sending payment confirmation email:', emailError);
+        // Don't fail the approval if email fails
+      }
+      
       return updated;
     }
     
     // For bookings (action: 'approve'), single approval is sufficient
     if (approval.resourceType === 'booking' && approval.action === 'approve') {
+      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+      
       const updated = await prisma.approval.update({ 
         where: { id: approval.id }, 
         data: { 
@@ -289,6 +421,65 @@ export async function approve(resourceType: string, resourceId: number, approver
         } 
       });
       await prisma.booking.update({ where: { id: approval.resourceId }, data: { status: 'APPROVED_PENDING_PAYMENT' } });
+      
+      // Send approval email to requester
+      try {
+        const { sendBookingApprovalEmail } = await import('@/lib/email');
+        // Get base URL, ensuring it's a clean URL without the variable name
+        let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || 'http://localhost:3001';
+        // Remove any trailing slashes and ensure it's a proper URL
+        baseUrl = baseUrl.trim().replace(/\/$/, '');
+        // If it somehow contains the variable name, extract just the URL part
+        if (baseUrl.includes('BASE_URL=')) {
+          baseUrl = baseUrl.split('BASE_URL=')[1] || 'http://localhost:3001';
+        }
+        await sendBookingApprovalEmail({
+          bookingRef: booking.bookingRef,
+          requesterName: booking.requesterName,
+          email: booking.email,
+          phone: booking.phone,
+          hall: booking.hall,
+          date: booking.date.toISOString(),
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          purpose: booking.purpose,
+          amount: booking.amount || undefined,
+        }, baseUrl);
+      } catch (emailError: any) {
+        console.error('Error sending booking approval email:', emailError);
+        // Don't fail the approval if email fails
+      }
+      
+      return updated;
+    }
+    
+    // For booking deletions, single approval is sufficient - delete the booking when approved
+    if (approval.resourceType === 'booking' && approval.action === 'delete') {
+      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+      
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      
+      // Delete the booking after approval
+      await prisma.booking.delete({ where: { id: approval.resourceId } });
+      
+      // Audit log with requestor and approver
+      await audit(approverId, 'approve_booking_delete', 'booking', approval.resourceId,
+        booking,
+        { action: 'delete', status: 'deleted' },
+        approval.submitterId,
+        approverId
+      );
+      
       return updated;
     }
     
@@ -310,5 +501,58 @@ export async function approve(resourceType: string, resourceId: number, approver
 export async function reject(resourceType: string, resourceId: number, approverId: number, comment: string) {
   const approval = await prisma.approval.findFirst({ where: { resourceType, resourceId, status: 'SUBMITTED' } });
   if (!approval) throw new Error('No pending approval');
-  return prisma.approval.update({ where: { id: approval.id }, data: { status: 'REJECTED', comment2: comment } });
+  
+  // For bookings, comment is mandatory
+  if (approval.resourceType === 'booking' && (!comment || comment.trim() === '')) {
+    throw new Error('Rejection reason is required for booking rejections');
+  }
+  
+  const updated = await prisma.approval.update({ 
+    where: { id: approval.id }, 
+    data: { 
+      status: 'REJECTED', 
+      approver1Id: approverId,
+      comment1: comment 
+    } 
+  });
+  
+  // Audit log with requestor and approver for rejection
+  await audit(approverId, `reject_${approval.resourceType}`, approval.resourceType, approval.resourceId,
+    { status: 'SUBMITTED' },
+    { status: 'REJECTED', comment },
+    approval.submitterId,
+    approverId
+  );
+  
+  // Update booking status to REJECTED
+  if (approval.resourceType === 'booking') {
+    await prisma.booking.update({ 
+      where: { id: approval.resourceId }, 
+      data: { status: 'REJECTED' } 
+    });
+    
+    // Send rejection email to requester
+    try {
+      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
+      if (booking) {
+        const { sendBookingRejectionEmail } = await import('@/lib/email');
+        await sendBookingRejectionEmail({
+          bookingRef: booking.bookingRef,
+          requesterName: booking.requesterName,
+          email: booking.email,
+          phone: booking.phone,
+          hall: booking.hall,
+          date: booking.date.toISOString(),
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          purpose: booking.purpose,
+        }, comment);
+      }
+    } catch (emailError: any) {
+      console.error('Error sending booking rejection email:', emailError);
+      // Don't fail the rejection if email fails
+    }
+  }
+  
+  return updated;
 }
