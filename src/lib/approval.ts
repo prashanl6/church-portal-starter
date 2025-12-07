@@ -94,6 +94,70 @@ export async function approve(resourceType: string, resourceId: number, approver
       return updated;
     }
     
+    // For asset updates, parse the update data from comment1 and update the original asset
+    if (approval.resourceType === 'asset' && approval.action === 'update') {
+      let updateData: any = {};
+      try {
+        // Parse the update data stored in comment1
+        if (approval.comment1) {
+          updateData = JSON.parse(approval.comment1);
+        }
+      } catch (e) {
+        throw new Error('Invalid update data in approval');
+      }
+      
+      const asset = await prisma.asset.findUnique({ where: { id: approval.resourceId } });
+      if (!asset) {
+        throw new Error('Asset not found');
+      }
+      
+      // Update the original asset with the new data
+      await prisma.asset.update({
+        where: { id: approval.resourceId },
+        data: {
+          reference: updateData.reference,
+          value: updateData.value,
+          quantity: updateData.quantity,
+          labelCategory: updateData.labelCategory,
+          notes: updateData.notes
+        }
+      });
+      
+      // Update approval with approver comment (replacing the JSON data)
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment || 'Approved', // Replace JSON with approver's comment
+          status: 'APPROVED' 
+        } 
+      });
+      
+      return updated;
+    }
+    
+    // For asset deletions, single approval is sufficient - delete the asset when approved
+    if (approval.resourceType === 'asset' && approval.action === 'delete') {
+      const asset = await prisma.asset.findUnique({ where: { id: approval.resourceId } });
+      if (!asset) {
+        throw new Error('Asset not found');
+      }
+      
+      const updated = await prisma.approval.update({ 
+        where: { id: approval.id }, 
+        data: { 
+          approver1Id: approverId, 
+          comment1: comment,
+          status: 'APPROVED' 
+        } 
+      });
+      
+      // Delete the asset after approval
+      await prisma.asset.delete({ where: { id: approval.resourceId } });
+      
+      return updated;
+    }
+    
     // For bookings (action: 'approve'), single approval is sufficient
     if (approval.resourceType === 'booking' && approval.action === 'approve') {
       const updated = await prisma.approval.update({ 

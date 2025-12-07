@@ -5,8 +5,27 @@ import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
 
 export async function GET() {
-  const list = await prisma.asset.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
-  return NextResponse.json({ list });
+  // Get all assets including pending ones (those with pending approvals)
+  const assets = await prisma.asset.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
+  
+  // Get approval status for each asset
+  const assetsWithApproval = await Promise.all(assets.map(async (asset) => {
+    const approval = await prisma.approval.findFirst({
+      where: {
+        resourceType: 'asset',
+        resourceId: asset.id
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    return {
+      ...asset,
+      approvalStatus: approval ? approval.status : 'APPROVED', // If no approval record, assume approved (old assets)
+      approvalAction: approval ? approval.action : null // Include the action type (create, update, delete)
+    };
+  }));
+  
+  return NextResponse.json({ list: assetsWithApproval });
 }
 
 export async function POST(req: Request) {

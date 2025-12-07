@@ -122,7 +122,7 @@ export default function ApprovalsPage() {
                   )}
                   {a.status === 'APPROVED' && (
                     <span className="ml-2 px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
-                      ✓ Approved{a.resourceType === 'notice' || a.resourceType === 'sermon' ? ' and published' : a.resourceType === 'booking' ? ' (pending payment)' : ''}
+                      ✓ Approved{a.resourceType === 'notice' || a.resourceType === 'sermon' ? ' and published' : a.resourceType === 'booking' ? ' (pending payment)' : a.resourceType === 'asset' && a.action === 'delete' ? ' and deleted' : ''}
                     </span>
                   )}
                   {a.approver1 && (
@@ -189,11 +189,53 @@ export default function ApprovalsPage() {
                 {/* Asset Details */}
                 {a.assetDetails && (
                   <div className="mt-2 text-sm space-y-1">
-                    <div><strong>Reference:</strong> {a.assetDetails.reference}</div>
-                    <div><strong>Value:</strong> {a.assetDetails.value}</div>
-                    <div><strong>Quantity:</strong> {a.assetDetails.quantity}</div>
-                    <div><strong>Category:</strong> {a.assetDetails.labelCategory}</div>
-                    {a.assetDetails.notes && <div><strong>Notes:</strong> {a.assetDetails.notes}</div>}
+                    {a.action === 'delete' && !a.assetDetails.deleted && (
+                      <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="font-semibold text-red-800">⚠️ Delete Request</div>
+                        <div className="text-xs text-red-700 mt-1">This asset will be permanently deleted if approved.</div>
+                      </div>
+                    )}
+                    {a.action === 'update' && a.assetDetails.proposedChanges && (
+                      <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="font-semibold text-blue-800">📝 Update Request</div>
+                        <div className="text-xs text-blue-700 mt-1">The following changes will be applied if approved:</div>
+                      </div>
+                    )}
+                    {a.assetDetails.deleted ? (
+                      <div className="mb-2 p-3 bg-gray-100 border border-gray-300 rounded-lg">
+                        <div className="font-semibold text-gray-700">Asset has been deleted</div>
+                        <div className="text-xs text-gray-600 mt-1">Reference: {a.assetDetails.reference}</div>
+                      </div>
+                    ) : a.action === 'update' && a.assetDetails.proposedChanges ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="font-semibold text-xs text-gray-500 mb-2">Current Values</div>
+                          <div><strong>Reference:</strong> {a.assetDetails.reference}</div>
+                          <div><strong>Value:</strong> LKR {a.assetDetails.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div><strong>Quantity:</strong> {a.assetDetails.quantity.toLocaleString()}</div>
+                          <div><strong>Category:</strong> {a.assetDetails.labelCategory}</div>
+                          {a.assetDetails.notes && <div><strong>Notes:</strong> {a.assetDetails.notes}</div>}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-xs text-blue-600 mb-2">Proposed Changes</div>
+                          <div><strong>Reference:</strong> {a.assetDetails.proposedChanges.reference}</div>
+                          <div><strong>Value:</strong> LKR {a.assetDetails.proposedChanges.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div><strong>Quantity:</strong> {a.assetDetails.proposedChanges.quantity.toLocaleString()}</div>
+                          <div><strong>Category:</strong> {a.assetDetails.proposedChanges.labelCategory}</div>
+                          {a.assetDetails.proposedChanges.notes !== undefined && (
+                            <div><strong>Notes:</strong> {a.assetDetails.proposedChanges.notes || '(empty)'}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div><strong>Reference:</strong> {a.assetDetails.reference}</div>
+                        <div><strong>Value:</strong> LKR {a.assetDetails.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div><strong>Quantity:</strong> {a.assetDetails.quantity.toLocaleString()}</div>
+                        <div><strong>Category:</strong> {a.assetDetails.labelCategory}</div>
+                        {a.assetDetails.notes && <div><strong>Notes:</strong> {a.assetDetails.notes}</div>}
+                      </>
+                    )}
                   </div>
                 )}
               </div>

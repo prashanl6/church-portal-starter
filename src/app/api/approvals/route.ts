@@ -57,6 +57,18 @@ export async function GET() {
     }
     if (approval.resourceType === 'asset') {
       const asset = await prisma.asset.findUnique({ where: { id: approval.resourceId } });
+      
+      // For update requests, parse the proposed changes from comment1
+      let proposedChanges: any = null;
+      if (approval.action === 'update' && approval.status === 'SUBMITTED' && approval.comment1) {
+        try {
+          proposedChanges = JSON.parse(approval.comment1);
+        } catch (e) {
+          // If parsing fails, comment1 might already contain approver comment
+        }
+      }
+      
+      // Asset might be null if it was already deleted (for delete approvals that were approved)
       return {
         ...approval,
         assetDetails: asset ? {
@@ -65,8 +77,13 @@ export async function GET() {
           quantity: asset.quantity,
           labelCategory: asset.labelCategory,
           notes: asset.notes,
-          status: asset.status
-        } : null
+          status: asset.status,
+          proposedChanges: proposedChanges // Include proposed changes for update requests
+        } : (approval.action === 'delete' ? {
+          // For approved deletions, asset no longer exists, but we can show it was deleted
+          reference: 'Asset #' + approval.resourceId,
+          deleted: true
+        } : null)
       };
     }
     return approval;
