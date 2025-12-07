@@ -1,13 +1,42 @@
 'use client';
 import useSWR from 'swr';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const fetcher = (url:string) => fetch(url).then(r=>r.json());
 
 type FilterStatus = 'all' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
 export default function ApprovalsPage() {
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const searchParams = useSearchParams();
+  const urlFilter = searchParams.get('filter') as FilterStatus | null;
+  // Default to 'SUBMITTED' (Pending) if no filter is specified
+  const [filter, setFilter] = useState<FilterStatus>(urlFilter && ['all', 'SUBMITTED', 'APPROVED', 'REJECTED'].includes(urlFilter) ? urlFilter : 'SUBMITTED');
+  
+  const router = useRouter();
+  
+  // Update filter when URL changes
+  useEffect(() => {
+    const urlFilter = searchParams.get('filter') as FilterStatus | null;
+    if (urlFilter && ['all', 'SUBMITTED', 'APPROVED', 'REJECTED'].includes(urlFilter)) {
+      setFilter(urlFilter);
+    } else if (!urlFilter) {
+      // If no filter in URL, default to SUBMITTED (Pending)
+      setFilter('SUBMITTED');
+    }
+  }, [searchParams]);
+  
+  const handleFilterChange = (newFilter: FilterStatus) => {
+    setFilter(newFilter);
+    const params = new URLSearchParams(searchParams.toString());
+    if (newFilter === 'all') {
+      params.delete('filter');
+    } else {
+      params.set('filter', newFilter);
+    }
+    router.push(`/admin/approvals?${params.toString()}`);
+  };
+  
   const { data, mutate } = useSWR('/api/approvals', fetcher);
   const [comment, setComment] = useState<{ [key: number]: string }>({});
   const [showActions, setShowActions] = useState<{ [key: number]: boolean }>({});
@@ -77,28 +106,28 @@ export default function ApprovalsPage() {
       <h1 className="text-2xl font-semibold">Approvals</h1>
         <div className="flex gap-2 flex-wrap">
           <button
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All
-          </button>
-          <button
             className={`filter-btn ${filter === 'SUBMITTED' ? 'active' : ''}`}
-            onClick={() => setFilter('SUBMITTED')}
+            onClick={() => handleFilterChange('SUBMITTED')}
           >
             Pending
           </button>
           <button
             className={`filter-btn ${filter === 'APPROVED' ? 'active' : ''}`}
-            onClick={() => setFilter('APPROVED')}
+            onClick={() => handleFilterChange('APPROVED')}
           >
             Approved
           </button>
           <button
             className={`filter-btn ${filter === 'REJECTED' ? 'active' : ''}`}
-            onClick={() => setFilter('REJECTED')}
+            onClick={() => handleFilterChange('REJECTED')}
           >
             Rejected
+          </button>
+          <button
+            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+            onClick={() => handleFilterChange('all')}
+          >
+            All
           </button>
         </div>
       </div>

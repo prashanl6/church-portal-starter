@@ -399,6 +399,49 @@ body.admin-mode .user-logout-btn:active {
   background-color: rgba(255, 255, 255, 0.25);
 }
 
+/* Footer */
+.app-footer {
+  transition: all 0.3s ease;
+}
+
+body.admin-mode .app-footer {
+  background-color: rgba(99, 102, 241, 0.95) !important;
+  border-top-color: rgba(79, 70, 229, 0.5) !important;
+  box-shadow: 0 -2px 8px rgba(99, 102, 241, 0.2) !important;
+}
+
+body.admin-mode .app-footer > div > div:first-child,
+body.admin-mode .app-footer > div > div:first-child span {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+body.admin-mode .app-footer a {
+  color: rgba(255, 255, 255, 0.95) !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+body.admin-mode .app-footer a:hover {
+  color: rgb(255, 255, 255) !important;
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Footer */
+.app-footer {
+  transition: all 0.3s ease;
+}
+
+body.admin-mode .app-footer {
+  background-color: rgba(99, 102, 241, 0.95) !important;
+  border-top-color: rgba(79, 70, 229, 0.5) !important;
+  box-shadow: 0 -2px 8px rgba(99, 102, 241, 0.2) !important;
+}
+
+body.admin-mode .app-footer > div > div:first-child {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
 /* Filter buttons */
 .filter-btn {
   padding: 0.5rem 1rem;

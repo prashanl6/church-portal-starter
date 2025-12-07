@@ -5,7 +5,7 @@ export default function AdminHome() {
     <div className="grid gap-4">
       <h1 className="text-2xl font-semibold">Admin</h1>
       <div className="grid gap-3">
-        <Link className="btn" href="/admin/approvals">Approvals Queue</Link>
+        <Link className="btn" href="/admin/approvals?filter=SUBMITTED">Approvals Queue</Link>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Link className="btn-secondary" href="/admin/assets">Assets</Link>
           <Link className="btn-secondary" href="/admin/notices">Notices</Link>
