@@ -48,7 +48,7 @@ export default function Header() {
     }
     
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
       document.body.classList.remove('admin-mode');
       window.location.href = '/';
     } catch (error) {

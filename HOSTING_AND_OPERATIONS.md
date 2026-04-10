@@ -213,11 +213,30 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 
 | Symptom | Things to check |
 |---------|------------------|
-| Cannot log into `/admin` | Cookie blocked? HTTPS mismatch? `JWT_SECRET` changed? User role must be `admin` or `staff`. |
+| Cannot log into `/admin` after deploy | **(1)** Production DB often has **no users** — migrations do not run `seed`. Create users: run `npx prisma db seed` from your machine with `DATABASE_URL` pointing at production, **or** use the one-time **`POST /api/auth/bootstrap`** (set `BOOTSTRAP_ADMIN_SECRET` in Vercel, then remove it). **(2)** Set a strong **`JWT_SECRET`** in Vercel (not the dev default). **(3)** Auth cookies use **`Secure` on HTTPS** — the app sets this in production. |
 | Emails not sending | SMTP vars, provider blocking “less secure” apps, `FROM_EMAIL` alignment with provider. |
 | Cron always401/500 | `CRON_SECRET` set in production but scheduler missing `Authorization: Bearer ...`. |
 | Processes missing for public | Status must be **published** and tag **Public** for anonymous users. |
 | Build fails on migrate | `DATABASE_URL` unreachable from build environment; run migrations in CI with DB access. |
+
+### 8.1 First admin on production (e.g. Vercel)
+
+Deploying runs **migrations** but **not** the demo **seed**, so the `User` table is often **empty** and every login returns “Invalid credentials”.
+
+**Option A — Bootstrap API (quick)**  
+1. In Vercel → Environment Variables, add **`BOOTSTRAP_ADMIN_SECRET`** (long random string). Redeploy.  
+2. Send a **single** POST (then remove the env var):
+
+```bash
+curl -sS -X POST "https://YOUR_DOMAIN.vercel.app/api/auth/bootstrap" \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"YOUR_BOOTSTRAP_ADMIN_SECRET","email":"you@church.org","password":"YourSecurePass","name":"Admin"}'
+```
+
+3. Log in at `/login` with that email and password. **Unset `BOOTSTRAP_ADMIN_SECRET`** in Vercel afterward.
+
+**Option B — Seed from your computer**  
+With `DATABASE_URL` set to the same database Vercel uses, run `npx prisma db seed` (see `README.md` for default demo accounts, or adjust `scripts/seed.js`).
 
 ---
 

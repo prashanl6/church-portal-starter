@@ -9,7 +9,12 @@ export default function LoginPage() {
 
   const onSubmit = async (e: any) => {
     e.preventDefault();
-    const res = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email, password}) });
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ email, password }),
+    });
     if (res.ok) {
       setMsg('Logged in. Go to Admin → Approvals.');
       window.location.href = '/admin';
