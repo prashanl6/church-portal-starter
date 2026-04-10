@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 /**
  * Scheduled job: cancel APPROVED_PENDING_PAYMENT bookings once payment is not confirmed by 1 hour before start.
  * Secure with CRON_SECRET: Authorization: Bearer <CRON_SECRET>
- * (Vercel Cron sends this when CRON_SECRET is set in project env.)
+ * (Vercel Cron sends this when CRON_SECRET is set in project env. Schedule: see vercel.json.)
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;

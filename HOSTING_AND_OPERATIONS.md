@@ -63,7 +63,7 @@ Plan backups and restore tests for whatever database you choose.
 
 1. Connect the Git repository and set the **root** to the app root (where `package.json` lives).
 2. Add **all** variables from `.env.example` in the Vercel project **Settings → Environment Variables** (Production and Preview as needed).
-3. Set **`CRON_SECRET`** in production. Vercel Cron (see `vercel.json`) calls `/api/cron/booking-auto-cancel` every five minutes; the route expects `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is set.
+3. Set **`CRON_SECRET`** in production. Vercel Cron (see `vercel.json`) calls `/api/cron/booking-auto-cancel` **once per day at 00:00 UTC**; the route expects `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is set.
 4. Confirm **`NEXT_PUBLIC_BASE_URL`** and **`BASE_URL`** are your real public `https://` domain.
 5. Resolve **SQLite vs hosted DB** per §2.4 before relying on production data.
 
@@ -160,7 +160,7 @@ Admins editing from the public **Processes** page (when logged in as admin) shou
 ## 6. Automation: booking auto-cancel cron
 
 - **Route**: `GET /api/cron/booking-auto-cancel`
-- **Schedule**: Defined in `vercel.json` (every5 minutes) when using Vercel Cron.
+- **Schedule**: Defined in `vercel.json` (once daily at **00:00 UTC**) when using Vercel Cron.
 - **Security**: With `CRON_SECRET` set, requests must include header `Authorization: Bearer <CRON_SECRET>`.
 - **Behaviour**: Cancels bookings that remain unpaid by the configured deadline relative to hall start time (see code in `src/lib/bookingAutoCancel.ts` and `BOOKING_TIMEZONE`).
 
