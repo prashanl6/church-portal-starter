@@ -1,6 +1,6 @@
 'use client';
 import useSWR from 'swr';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -31,7 +31,7 @@ const FILTER_OPTIONS: FilterStatus[] = [
   'AUTO_CANCELLED',
 ];
 
-export default function AdminBookingsPage() {
+function AdminBookingsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlFilter = searchParams.get('filter') as FilterStatus | null;
@@ -412,3 +412,16 @@ export default function AdminBookingsPage() {
   );
 }
 
+export default function AdminBookingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container py-8 text-slate-600" aria-busy="true">
+          Loading bookings…
+        </div>
+      }
+    >
+      <AdminBookingsPageContent />
+    </Suspense>
+  );
+}

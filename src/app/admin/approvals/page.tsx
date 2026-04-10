@@ -1,13 +1,13 @@
 'use client';
 import useSWR from 'swr';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const fetcher = (url:string) => fetch(url).then(r=>r.json());
 
 type FilterStatus = 'all' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
-export default function ApprovalsPage() {
+function ApprovalsPageContent() {
   const searchParams = useSearchParams();
   const urlFilter = searchParams.get('filter') as FilterStatus | null;
   // Default to 'SUBMITTED' (Pending) if no filter is specified
@@ -520,5 +520,19 @@ export default function ApprovalsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ApprovalsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container py-8 text-slate-600" aria-busy="true">
+          Loading approvals…
+        </div>
+      }
+    >
+      <ApprovalsPageContent />
+    </Suspense>
   );
 }
