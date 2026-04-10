@@ -1,6 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 import RichTextEditor from '@/components/RichTextEditor';
+import type { ProcessAudience } from '@/lib/processAudience';
+
+interface Attachment {
+  id: number;
+  fileName: string;
+  storedPath: string;
+  mimeType: string | null;
+  byteSize: number | null;
+  createdAt: string;
+}
 
 interface Process {
   id: number;
@@ -8,8 +18,55 @@ interface Process {
   contentHtml: string;
   version: number;
   status: string;
+  audience: ProcessAudience;
   createdAt: string;
   updatedAt: string;
+  attachments?: Attachment[];
+}
+
+const FILE_INPUT_ACCEPT =
+  '.xls,.xlsx,.doc,.docx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+function formatBytes(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function mapApiProcess(raw: unknown): Process {
+  const p = raw as Record<string, unknown>;
+  const row = p as unknown as Process;
+  return {
+    ...row,
+    audience: p.audience === 'steward' ? 'steward' : 'public',
+    attachments: Array.isArray(p.attachments) ? (p.attachments as Attachment[]) : [],
+  };
+}
+
+function AudienceRadios(props: {
+  value: ProcessAudience;
+  onChange: (v: ProcessAudience) => void;
+  name: string;
+}) {
+  const { value, onChange, name } = props;
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="label mb-0">Tag (required)</legend>
+      <p className="text-xs text-gray-600">
+        <strong>Public</strong> — listed for everyone, including without a login. <strong>Steward</strong> — listed only
+        for users who are logged in.
+      </p>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name={name} value="public" checked={value === 'public'} onChange={() => onChange('public')} />
+        Public
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name={name} value="steward" checked={value === 'steward'} onChange={() => onChange('steward')} />
+        Steward
+      </label>
+    </fieldset>
+  );
 }
 
 export default function ProcessesPage() {
@@ -17,36 +74,49 @@ export default function ProcessesPage() {
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ title: '', contentHtml: '' });
+  const [editForm, setEditForm] = useState<{ title: string; contentHtml: string; audience: ProcessAudience }>({
+    title: '',
+    contentHtml: '',
+    audience: 'public',
+  });
+  const [editPendingFiles, setEditPendingFiles] = useState<File[]>([]);
+  const [editPendingRemoveIds, setEditPendingRemoveIds] = useState<number[]>([]);
 
   useEffect(() => {
-    const fetchProcesses = async () => {
+    let cancelled = false;
+    (async () => {
       try {
-        const res = await fetch('/api/processes');
+        const authRes = await fetch('/api/auth/check', { credentials: 'same-origin' });
+        const loggedIn = authRes.ok;
+        if (!cancelled) {
+          setIsLoggedIn(loggedIn);
+          if (loggedIn) {
+            const data = await authRes.json();
+            setIsAdmin(data.role === 'admin');
+          } else {
+            setIsAdmin(false);
+          }
+        }
+        const res = await fetch('/api/processes', { credentials: 'same-origin' });
         const data = await res.json();
-        setProcesses(data.list || []);
-      } catch (error) {
-        console.error('Failed to fetch processes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    const checkAdmin = async () => {
-      try {
-        const res = await fetch('/api/auth/check');
-        if (res.ok) {
-          const data = await res.json();
-          setIsAdmin(data.role === 'admin');
+        if (!cancelled) {
+          setProcesses((data.list || []).map((p: unknown) => mapApiProcess(p)));
         }
       } catch (error) {
-        setIsAdmin(false);
+        console.error('Failed to load processes:', error);
+        if (!cancelled) {
+          setIsAdmin(false);
+          setIsLoggedIn(false);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    
-    fetchProcesses();
-    checkAdmin();
   }, []);
 
   const handleDelete = async (processId: number, processTitle: string) => {
@@ -55,13 +125,16 @@ export default function ProcessesPage() {
     }
     
     try {
-      const res = await fetch(`/api/admin/processes/${processId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/processes/${processId}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
       if (res.ok) {
         alert('Delete request submitted for approval');
         // Refresh processes list
-        const processesRes = await fetch('/api/processes');
+        const processesRes = await fetch('/api/processes', { credentials: 'same-origin' });
         const processesData = await processesRes.json();
-        setProcesses(processesData.list || []);
+        setProcesses((processesData.list || []).map((p: unknown) => mapApiProcess(p)));
         if (selectedProcess?.id === processId) {
           setSelectedProcess(null);
         }
@@ -75,7 +148,10 @@ export default function ProcessesPage() {
   };
 
   const handleEdit = (process: Process) => {
-    setEditForm({ title: process.title, contentHtml: process.contentHtml });
+    const aud: ProcessAudience = process.audience === 'steward' ? 'steward' : 'public';
+    setEditForm({ title: process.title, contentHtml: process.contentHtml, audience: aud });
+    setEditPendingFiles([]);
+    setEditPendingRemoveIds([]);
     setEditingId(process.id);
     setSelectedProcess(null);
   };
@@ -91,16 +167,50 @@ export default function ProcessesPage() {
       const res = await fetch(`/api/admin/processes/${editingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm)
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          ...editForm,
+          removeAttachmentIds: editPendingRemoveIds,
+        }),
       });
       if (res.ok) {
-        alert('Update request submitted for approval');
-        setEditForm({ title: '', contentHtml: '' });
+        const id = editingId;
+        const filesToUpload = editPendingFiles;
+        const hadNewFiles = filesToUpload.length > 0;
+        const hadScheduledRemovals = editPendingRemoveIds.length > 0;
+        const uploadErrors: string[] = [];
+        if (id != null && hadNewFiles) {
+          for (const f of filesToUpload) {
+            const fd = new FormData();
+            fd.append('file', f);
+            const up = await fetch(`/api/admin/processes/${id}/attachments`, {
+              method: 'POST',
+              body: fd,
+              credentials: 'same-origin',
+            });
+            const upBody = await up.json().catch(() => ({}));
+            if (!up.ok) {
+              uploadErrors.push(`${f.name}: ${upBody.error || 'upload failed'}`);
+            }
+          }
+        }
+        setEditPendingFiles([]);
+        setEditPendingRemoveIds([]);
+        setEditForm({ title: '', contentHtml: '', audience: 'public' });
         setEditingId(null);
-        // Refresh processes list
-        const processesRes = await fetch('/api/processes');
+        const processesRes = await fetch('/api/processes', { credentials: 'same-origin' });
         const processesData = await processesRes.json();
-        setProcesses(processesData.list || []);
+        setProcesses((processesData.list || []).map((p: unknown) => mapApiProcess(p)));
+        if (uploadErrors.length) {
+          alert(
+            `Update request submitted for approval.\n\nSome new files could not be uploaded:\n${uploadErrors.join('\n')}`
+          );
+        } else {
+          const parts = ['Update request submitted for approval.'];
+          if (hadNewFiles) parts.push('New files were uploaded.');
+          if (hadScheduledRemovals) parts.push('Marked files will be removed after approval.');
+          alert(parts.join(' '));
+        }
       } else {
         const errorData = await res.json().catch(() => ({ error: 'Failed to submit update request' }));
         alert(errorData.error || 'Failed to submit update request');
@@ -111,7 +221,9 @@ export default function ProcessesPage() {
   };
 
   const cancelEdit = () => {
-    setEditForm({ title: '', contentHtml: '' });
+    setEditForm({ title: '', contentHtml: '', audience: 'public' });
+    setEditPendingFiles([]);
+    setEditPendingRemoveIds([]);
     setEditingId(null);
   };
 
@@ -178,6 +290,11 @@ export default function ProcessesPage() {
                 required
               />
             </div>
+            <AudienceRadios
+              name="public-edit-process-audience"
+              value={editForm.audience}
+              onChange={(audience) => setEditForm({ ...editForm, audience })}
+            />
             <div>
               <label className="label">Content</label>
               <RichTextEditor
@@ -186,6 +303,136 @@ export default function ProcessesPage() {
                 placeholder="Enter process document content. Use the toolbar to format text with bold, italic, underline, colors, and more..."
               />
             </div>
+            {process && isAdmin && (
+              <div style={{ borderTop: '1px solid rgb(226, 232, 240)', paddingTop: '1rem' }}>
+                <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Attached documents (Excel / Word)</h2>
+                <p style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)', marginBottom: '0.5rem' }}>
+                  New files upload when you submit. Removals apply only after this update is approved.
+                </p>
+                <p
+                  style={{
+                    fontSize: '0.8125rem',
+                    color: 'rgb(120, 53, 15)',
+                    background: 'rgb(255, 251, 235)',
+                    border: '1px solid rgb(253, 230, 138)',
+                    borderRadius: '0.375rem',
+                    padding: '0.5rem 0.75rem',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  Files you remove stay on the live document until an approver approves this edit.
+                </p>
+                {(process.attachments ?? []).length === 0 ? (
+                  <p style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)' }}>No files attached yet.</p>
+                ) : (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1rem 0', display: 'grid', gap: '0.5rem' }}>
+                    {(process.attachments ?? []).map((a) => {
+                      const marked = editPendingRemoveIds.includes(a.id);
+                      return (
+                        <li
+                          key={a.id}
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            fontSize: '0.875rem',
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '0.375rem',
+                            border: marked ? '1px solid rgb(253, 230, 138)' : '1px solid rgb(226, 232, 240)',
+                            background: marked ? 'rgb(255, 251, 235)' : 'rgb(248, 250, 252)',
+                          }}
+                        >
+                          <a
+                            href={a.storedPath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: 'rgb(37, 99, 235)',
+                              textDecoration: marked ? 'line-through' : undefined,
+                              opacity: marked ? 0.85 : 1,
+                            }}
+                          >
+                            {a.fileName}
+                          </a>
+                          {formatBytes(a.byteSize) && (
+                            <span style={{ color: 'rgb(148, 163, 184)' }}>{formatBytes(a.byteSize)}</span>
+                          )}
+                          {marked ? (
+                            <>
+                              <span style={{ fontSize: '0.75rem', color: 'rgb(146, 64, 14)' }}>Pending removal</span>
+                              <button
+                                type="button"
+                                onClick={() => setEditPendingRemoveIds((prev) => prev.filter((x) => x !== a.id))}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'rgb(37, 99, 235)',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8125rem',
+                                  textDecoration: 'underline',
+                                  padding: 0,
+                                }}
+                              >
+                                Undo
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditPendingRemoveIds((prev) => (prev.includes(a.id) ? prev : [...prev, a.id]))
+                              }
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'rgb(220, 38, 38)',
+                                cursor: 'pointer',
+                                fontSize: '0.8125rem',
+                                textDecoration: 'underline',
+                                padding: 0,
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <label className="label" style={{ display: 'block', marginBottom: '0.25rem' }}>
+                  Add Excel / Word files (optional)
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  accept={FILE_INPUT_ACCEPT}
+                  style={{ fontSize: '0.875rem' }}
+                  onChange={(e) => {
+                    const next = Array.from(e.target.files || []);
+                    e.target.value = '';
+                    if (next.length) setEditPendingFiles((prev) => [...prev, ...next]);
+                  }}
+                />
+                {editPendingFiles.length > 0 && (
+                  <ul style={{ listStyle: 'none', padding: '0.5rem', margin: '0.75rem 0 0', background: 'rgb(248, 250, 252)', borderRadius: '0.375rem', border: '1px solid rgb(226, 232, 240)', fontSize: '0.875rem' }}>
+                    {editPendingFiles.map((f, i) => (
+                      <li key={`${f.name}-${i}-${f.size}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                          style={{ background: 'none', border: 'none', color: 'rgb(220, 38, 38)', cursor: 'pointer', fontSize: '0.8125rem', flexShrink: 0 }}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <div className="flex gap-2">
               <button className="btn w-fit" type="submit">Submit Update for Approval</button>
               <button className="btn-secondary w-fit" type="button" onClick={cancelEdit}>Cancel</button>
@@ -240,6 +487,12 @@ export default function ProcessesPage() {
                   color: 'rgb(100, 116, 139)',
                   margin: 0
                 }}>
+                  {isLoggedIn && (
+                    <>
+                      Tag: {selectedProcess.audience === 'steward' ? 'Steward' : 'Public'}
+                      {' · '}
+                    </>
+                  )}
                   Version {selectedProcess.version} · Updated {new Date(selectedProcess.updatedAt).toLocaleDateString()}
                 </p>
               </div>
@@ -269,6 +522,45 @@ export default function ProcessesPage() {
             )}
           </div>
 
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Documents</h2>
+            {(selectedProcess.attachments ?? []).length === 0 ? (
+              <p style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)', margin: 0 }}>No Excel or Word attachments.</p>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.5rem' }}>
+                {(selectedProcess.attachments ?? []).map((a) => (
+                  <li
+                    key={a.id}
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      fontSize: '0.9375rem',
+                    }}
+                  >
+                    <a
+                      href={a.storedPath}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: 'rgb(37, 99, 235)', fontWeight: 500 }}
+                    >
+                      {a.fileName}
+                    </a>
+                    {formatBytes(a.byteSize) && (
+                      <span style={{ fontSize: '0.8125rem', color: 'rgb(148, 163, 184)' }}>{formatBytes(a.byteSize)}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {isAdmin && (
+              <p style={{ fontSize: '0.8125rem', color: 'rgb(100, 116, 139)', marginTop: '0.75rem', marginBottom: 0 }}>
+                To add or remove attachments, use <strong>Edit</strong>.
+              </p>
+            )}
+          </div>
+
           <article 
             className="notice-content"
             style={{
@@ -289,7 +581,10 @@ export default function ProcessesPage() {
         <div style={{ marginBottom: '2rem' }}>
           <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>Process Documents</h1>
           <p className="page-subtitle" style={{ marginBottom: 0 }}>
-            View and manage church process documents
+            View and manage church process documents.
+            {!isLoggedIn
+              ? ' Only public documents are listed — sign in to see steward documents.'
+              : ' Signed in — public and steward documents are listed.'}
           </p>
         </div>
 
@@ -347,9 +642,29 @@ export default function ProcessesPage() {
                       fontWeight: 600,
                       color: 'rgb(15, 23, 42)',
                       margin: 0,
-                      marginBottom: '0.25rem'
+                      marginBottom: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
                     }}>
                       {process.title}
+                      {isLoggedIn && process.audience === 'steward' && (
+                        <span
+                          style={{
+                            fontSize: '0.6875rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '9999px',
+                            background: 'rgb(237, 233, 254)',
+                            color: 'rgb(91, 33, 182)',
+                          }}
+                        >
+                          Steward
+                        </span>
+                      )}
                     </h2>
                     <p style={{
                       fontSize: '0.875rem',
@@ -357,6 +672,9 @@ export default function ProcessesPage() {
                       margin: 0
                     }}>
                       Version {process.version} · Updated {new Date(process.updatedAt).toLocaleDateString()}
+                      {(process.attachments ?? []).length > 0
+                        ? ` · ${(process.attachments ?? []).length} file${(process.attachments ?? []).length !== 1 ? 's' : ''}`
+                        : ''}
                     </p>
                   </div>
                   <svg style={{

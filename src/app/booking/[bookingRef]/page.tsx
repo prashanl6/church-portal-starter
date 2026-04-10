@@ -141,6 +141,7 @@ export default function BookingDetailsPage() {
     APPROVED_PENDING_PAYMENT: 'rgb(59, 130, 246)',
     BOOKED_PAID: 'rgb(34, 197, 94)',
     REJECTED: 'rgb(239, 68, 68)',
+    AUTO_CANCELLED: 'rgb(194, 65, 12)',
   };
 
   return (
@@ -308,6 +309,23 @@ export default function BookingDetailsPage() {
             <h3 style={{ color: 'rgb(220, 38, 38)', marginBottom: '0.5rem' }}>Booking Rejected</h3>
             <p style={{ color: 'rgb(220, 38, 38)' }}>
               This booking request has been rejected. Please contact us if you have any questions.
+            </p>
+          </div>
+        )}
+
+        {booking.status === 'AUTO_CANCELLED' && (
+          <div style={{
+            marginTop: '2rem',
+            padding: '1.5rem',
+            backgroundColor: 'rgb(255, 247, 237)',
+            borderRadius: '0.5rem',
+            border: '1px solid rgb(253, 186, 116)'
+          }}>
+            <h3 style={{ color: 'rgb(194, 65, 12)', marginBottom: '0.5rem' }}>Booking automatically cancelled</h3>
+            <p style={{ color: 'rgb(120, 53, 15)' }}>
+              This booking was cancelled automatically because payment was not fully confirmed at least one hour before
+              the scheduled start time. The time slot has been released. Please contact us if you need help or wish to
+              book again.
             </p>
           </div>
         )}

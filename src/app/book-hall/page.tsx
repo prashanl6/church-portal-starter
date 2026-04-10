@@ -1,10 +1,22 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { computeHallBookingCharge } from '@/lib/hallBookingPricing';
 
 export default function BookHallPage() {
-  const [form, setForm] = useState({ fullName:'', email:'', phone:'', purpose:'', date:'', startTime:'', endTime:'', hall:'Main Hall', notes:'' });
+  const [form, setForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    purpose: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    hall: 'Main Hall',
+    notes: ''
+  });
   const [msg, setMsg] = useState('');
   const [booked, setBooked] = useState<any[]>([]);
+  const [ratePer30Minutes, setRatePer30Minutes] = useState<number>(0);
 
   useEffect(() => {
     (async () => {
@@ -14,51 +26,98 @@ export default function BookHallPage() {
     })();
   }, []);
 
-  const submit = async (e:any) => {
+  useEffect(() => {
+    (async () => {
+      const res = await fetch('/api/bookings/pricing');
+      const data = await res.json();
+      if (typeof data.ratePer30Minutes === 'number' && Number.isFinite(data.ratePer30Minutes)) {
+        setRatePer30Minutes(data.ratePer30Minutes);
+      }
+    })();
+  }, []);
+
+  const quote = useMemo(
+    () => computeHallBookingCharge(form.startTime, form.endTime, ratePer30Minutes),
+    [form.startTime, form.endTime, ratePer30Minutes]
+  );
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/bookings/request', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form)});
-    if (res.ok) setMsg('Request submitted. You will receive an email if approved.');
-    else setMsg('Could not submit request');
+    if (!form.purpose?.trim() || !form.date || !form.startTime || !form.endTime) {
+      setMsg('Please fill in purpose, date, start time, and end time.');
+      return;
+    }
+    if (!quote.ok) {
+      setMsg(quote.error);
+      return;
+    }
+    const fmt = (n: number) =>
+      n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const confirmMsg =
+      quote.total > 0
+        ? `Submit this booking request?\n\nEstimated hall hire: LKR ${fmt(quote.total)} (${quote.slots} × 30 min block${quote.slots !== 1 ? 's' : ''} at LKR ${fmt(ratePer30Minutes)} each)\n\nYou will still need admin approval before payment.`
+        : 'Submit this booking request? (No hall hire rate is configured yet — amount may be zero.)';
+    if (!window.confirm(confirmMsg)) return;
+
+    const res = await fetch('/api/bookings/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
+    let data: { error?: string } = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (res.ok) {
+      setMsg('Request submitted. You will receive an email if approved.');
+    } else {
+      setMsg(typeof data.error === 'string' ? data.error : 'Could not submit request');
+    }
   };
 
   return (
     <div style={{ display: 'grid', gap: '2rem' }}>
       <div>
-        <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>Book the Hall</h1>
+        <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>
+          Book the Hall
+        </h1>
         <p className="page-subtitle" style={{ marginBottom: 0 }}>
           Reserve the hall or chapel for your events and gatherings
         </p>
       </div>
       <div className="card">
-        <h2 style={{ 
-          fontSize: '1.25rem', 
-          fontWeight: 600, 
-          marginBottom: '1rem',
-          color: 'rgb(15, 23, 42)'
-        }}>
-          📅 Availability (booked dates)
+        <h2
+          style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            marginBottom: '1rem',
+            color: 'rgb(15, 23, 42)'
+          }}
+        >
+          {'\u{1F4C5}'} Availability (booked dates)
         </h2>
         {booked.length === 0 ? (
-          <p style={{ color: 'rgb(100, 116, 139)', margin: 0 }}>
-            No confirmed bookings scheduled
-          </p>
+          <p style={{ color: 'rgb(100, 116, 139)', margin: 0 }}>No confirmed bookings scheduled</p>
         ) : (
-          <ul style={{ 
-            listStyle: 'none', 
-            padding: 0, 
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem'
-          }}>
+          <ul
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem'
+            }}
+          >
             {booked
               .filter((b) => {
-                // Filter out past dates on client side as well (in case of timezone issues)
                 const bookingDate = new Date(b.date);
                 return bookingDate >= new Date();
               })
               .map((b, i) => (
-                <li 
+                <li
                   key={i}
                   style={{
                     padding: '0.75rem',
@@ -68,11 +127,11 @@ export default function BookHallPage() {
                   }}
                 >
                   <span style={{ fontWeight: 500 }}>
-                    {new Date(b.date).toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
+                    {new Date(b.date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
                     })}
                   </span>
                   <span style={{ color: 'rgb(71, 85, 105)', marginLeft: '0.5rem' }}>
@@ -89,34 +148,60 @@ export default function BookHallPage() {
         )}
       </div>
       <form onSubmit={submit} className="card" style={{ display: 'grid', gap: '1.5rem' }}>
-        <h2 style={{ 
-          fontSize: '1.25rem', 
-          fontWeight: 600, 
-          marginBottom: '0.5rem',
-          color: 'rgb(15, 23, 42)'
-        }}>
-          📝 Booking Request
+        <h2
+          style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            marginBottom: '0.5rem',
+            color: 'rgb(15, 23, 42)'
+          }}
+        >
+          {'\u{1F4DD}'} Booking Request
         </h2>
+        <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(71, 85, 105)' }}>
+          Bookings are only for <strong>8:00 a.m. – 10:00 p.m.</strong> Hall hire is calculated in{' '}
+          <strong>30-minute blocks</strong> from your start and end time (any partial block counts as a full block). The
+          total below is an estimate until your booking is approved.
+        </p>
         <div style={{ display: 'grid', gap: '1rem' }}>
           <div style={{ display: 'grid', gap: '0.5rem' }}>
             <label className="label">Full Name</label>
-            <input className="input" value={form.fullName} onChange={e=>setForm({...form, fullName:e.target.value})} />
+            <input
+              className="input"
+              value={form.fullName}
+              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            />
           </div>
           <div style={{ display: 'grid', gap: '0.5rem' }}>
             <label className="label">Email</label>
-            <input type="email" className="input" value={form.email} onChange={e=>setForm({...form, email:e.target.value})} />
+            <input
+              type="email"
+              className="input"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
           </div>
           <div style={{ display: 'grid', gap: '0.5rem' }}>
             <label className="label">Phone</label>
-            <input type="tel" className="input" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} />
+            <input
+              type="tel"
+              className="input"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
           </div>
           <div style={{ display: 'grid', gap: '0.5rem' }}>
             <label className="label">Purpose</label>
-            <input className="input" value={form.purpose} onChange={e=>setForm({...form, purpose:e.target.value})} required />
+            <input
+              className="input"
+              value={form.purpose}
+              onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+              required
+            />
           </div>
           <div style={{ display: 'grid', gap: '0.5rem' }}>
             <label className="label">Hall</label>
-            <select className="input" value={form.hall} onChange={e=>setForm({...form, hall:e.target.value})}>
+            <select className="input" value={form.hall} onChange={(e) => setForm({ ...form, hall: e.target.value })}>
               <option>Main Hall</option>
               <option>Chapel</option>
             </select>
@@ -124,29 +209,94 @@ export default function BookHallPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               <label className="label">Date</label>
-              <input type="date" className="input" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} />
+              <input
+                type="date"
+                className="input"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+              />
             </div>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               <label className="label">Start Time</label>
-              <input type="time" className="input" value={form.startTime} onChange={e=>setForm({...form, startTime:e.target.value})} />
+              <input
+                type="time"
+                className="input"
+                min="08:00"
+                max="22:00"
+                value={form.startTime}
+                onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+              />
             </div>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               <label className="label">End Time</label>
-              <input type="time" className="input" value={form.endTime} onChange={e=>setForm({...form, endTime:e.target.value})} />
+              <input
+                type="time"
+                className="input"
+                min="08:00"
+                max="22:00"
+                value={form.endTime}
+                onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+              />
             </div>
           </div>
         </div>
+        <div
+          style={{
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            backgroundColor: 'rgb(241, 245, 249)',
+            border: '1px solid rgb(226, 232, 240)'
+          }}
+        >
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'rgb(15, 23, 42)', marginBottom: '0.35rem' }}>
+            Estimated hall hire
+          </div>
+          {ratePer30Minutes <= 0 ? (
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(100, 116, 139)' }}>
+              The church has not set a per-30-minute rate yet. Your request can still be submitted; an administrator
+              will confirm any fees.
+            </p>
+          ) : !form.startTime || !form.endTime ? (
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(100, 116, 139)' }}>
+              Choose start and end times to see the total.
+            </p>
+          ) : !quote.ok ? (
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(153, 27, 27)' }}>{quote.error}</p>
+          ) : (
+            <div style={{ fontSize: '0.875rem', color: 'rgb(30, 41, 59)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'rgb(15, 23, 42)' }}>
+                LKR{' '}
+                {quote.total.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })}
+              </div>
+              <div style={{ marginTop: '0.35rem', color: 'rgb(71, 85, 105)' }}>
+                {quote.slots} block{quote.slots !== 1 ? 's' : ''} × LKR{' '}
+                {ratePer30Minutes.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })}{' '}
+                (30 min each)
+              </div>
+            </div>
+          )}
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <button className="btn btn-primary" style={{ width: 'fit-content' }}>Submit Request</button>
+          <button className="btn btn-primary" style={{ width: 'fit-content' }}>
+            Submit Request
+          </button>
           {msg && (
-            <p style={{ 
-              padding: '0.75rem 1rem',
-              borderRadius: '0.5rem',
-              backgroundColor: msg.includes('submitted') ? 'rgb(220, 252, 231)' : 'rgb(254, 226, 226)',
-              color: msg.includes('submitted') ? 'rgb(22, 101, 52)' : 'rgb(153, 27, 27)',
-              margin: 0,
-              fontSize: '0.875rem'
-            }}>
+            <p
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '0.5rem',
+                backgroundColor: msg.includes('submitted') ? 'rgb(220, 252, 231)' : 'rgb(254, 226, 226)',
+                color: msg.includes('submitted') ? 'rgb(22, 101, 52)' : 'rgb(153, 27, 27)',
+                margin: 0,
+                fontSize: '0.875rem'
+              }}
+            >
               {msg}
             </p>
           )}

@@ -5,18 +5,44 @@ import { useSearchParams, useRouter } from 'next/navigation';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
-type FilterStatus = 'all' | 'REQUESTED' | 'APPROVED_PENDING_PAYMENT' | 'BOOKED_PAID' | 'REJECTED';
+async function hallSettingsFetcher(url: string) {
+  const res = await fetch(url, { credentials: 'same-origin' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+type FilterStatus =
+  | 'all'
+  | 'REQUESTED'
+  | 'APPROVED_PENDING_PAYMENT'
+  | 'BOOKED_PAID'
+  | 'REJECTED'
+  | 'AUTO_CANCELLED';
+
+const FILTER_OPTIONS: FilterStatus[] = [
+  'all',
+  'REQUESTED',
+  'APPROVED_PENDING_PAYMENT',
+  'BOOKED_PAID',
+  'REJECTED',
+  'AUTO_CANCELLED',
+];
 
 export default function AdminBookingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlFilter = searchParams.get('filter') as FilterStatus | null;
-  const [filter, setFilter] = useState<FilterStatus>(urlFilter && ['all', 'REQUESTED', 'APPROVED_PENDING_PAYMENT', 'BOOKED_PAID', 'REJECTED'].includes(urlFilter) ? urlFilter : 'all');
+  const [filter, setFilter] = useState<FilterStatus>(
+    urlFilter && FILTER_OPTIONS.includes(urlFilter) ? urlFilter : 'all'
+  );
   
   // Update filter when URL changes
   useEffect(() => {
     const urlFilter = searchParams.get('filter') as FilterStatus | null;
-    if (urlFilter && ['all', 'REQUESTED', 'APPROVED_PENDING_PAYMENT', 'BOOKED_PAID', 'REJECTED'].includes(urlFilter)) {
+    if (urlFilter && FILTER_OPTIONS.includes(urlFilter)) {
       setFilter(urlFilter);
     } else if (!urlFilter) {
       setFilter('all');
@@ -35,6 +61,20 @@ export default function AdminBookingsPage() {
   };
 
   const { data, mutate } = useSWR('/api/admin/bookings', fetcher);
+  const {
+    data: hallSettings,
+    mutate: mutateHallSettings,
+    error: hallSettingsError,
+    isLoading: hallSettingsLoading
+  } = useSWR('/api/admin/hall-booking-settings', hallSettingsFetcher);
+  const [rateDraft, setRateDraft] = useState('');
+  const [rateSaving, setRateSaving] = useState(false);
+
+  useEffect(() => {
+    if (hallSettings && typeof hallSettings.ratePer30Minutes === 'number') {
+      setRateDraft(String(hallSettings.ratePer30Minutes));
+    }
+  }, [hallSettings]);
   
   // Filter bookings based on selected filter
   const filteredBookings = data?.list ? (filter === 'all' 
@@ -44,6 +84,65 @@ export default function AdminBookingsPage() {
 
   return (
     <div className="grid gap-4">
+      <div className="card grid gap-3">
+        <h2 className="text-lg font-semibold">Hall hire pricing</h2>
+        <p className="text-sm text-gray-600">
+          Set the amount charged per <strong>30-minute block</strong>. Public bookings multiply the number of blocks
+          (from start and end time, rounding up) by this rate to show an estimated total before the customer confirms.
+        </p>
+        {hallSettingsLoading && <p className="text-sm text-gray-500">Loading current rate…</p>}
+        {hallSettingsError && (
+          <p className="text-sm text-red-700">
+            Could not load hall pricing: {hallSettingsError.message}. If you recently ran a database migration, restart
+            the dev server and run <code className="text-xs bg-red-50 px-1 rounded">npx prisma generate</code>.
+          </p>
+        )}
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="label">LKR per 30 minutes</label>
+            <input
+              className="input max-w-xs"
+              type="number"
+              min={0}
+              step="0.01"
+              value={rateDraft}
+              onChange={(e) => setRateDraft(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            className="btn"
+            disabled={rateSaving}
+            onClick={async () => {
+              const n = parseFloat(rateDraft);
+              if (!Number.isFinite(n) || n < 0) {
+                alert('Enter a valid non-negative number');
+                return;
+              }
+              setRateSaving(true);
+              try {
+                const res = await fetch('/api/admin/hall-booking-settings', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
+                  body: JSON.stringify({ ratePer30Minutes: n })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  alert(data.error || 'Failed to save');
+                  return;
+                }
+                await mutateHallSettings();
+                alert('Hall hire rate saved');
+              } finally {
+                setRateSaving(false);
+              }
+            }}
+          >
+            {rateSaving ? 'Saving…' : 'Save rate'}
+          </button>
+        </div>
+      </div>
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-2xl font-semibold">Admin — Bookings</h1>
         <div className="flex gap-2 flex-wrap">
@@ -77,6 +176,12 @@ export default function AdminBookingsPage() {
           >
             Rejected
           </button>
+          <button
+            className={`filter-btn ${filter === 'AUTO_CANCELLED' ? 'active' : ''}`}
+            onClick={() => handleFilterChange('AUTO_CANCELLED')}
+          >
+            Auto-cancelled
+          </button>
         </div>
       </div>
       <div className="grid gap-3">
@@ -101,6 +206,8 @@ export default function AdminBookingsPage() {
                     booking.status === 'BOOKED_PAID' ? 'bg-green-100 text-green-800' :
                     booking.status === 'APPROVED_PENDING_PAYMENT' ? 'bg-yellow-100 text-yellow-800' :
                     booking.status === 'REQUESTED' ? 'bg-blue-100 text-blue-800' :
+                    booking.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                    booking.status === 'AUTO_CANCELLED' ? 'bg-orange-100 text-orange-900' :
                     'bg-gray-100 text-gray-800'
                   }`}>
                     {booking.status.replace(/_/g, ' ')}
@@ -130,9 +237,13 @@ export default function AdminBookingsPage() {
                     <strong>Payment Ref:</strong> {booking.paymentRef}
                   </div>
                 )}
-                {booking.amount && (
+                {booking.amount != null && (
                   <div className="text-sm">
-                    <strong>Amount:</strong> LKR {booking.amount.toLocaleString()}
+                    <strong>Amount:</strong> LKR{' '}
+                    {Number(booking.amount).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
                   </div>
                 )}
                 {booking.status === 'REQUESTED' && (

@@ -1,26 +1,87 @@
 'use client';
 import { useState, useEffect } from 'react';
 
+const RATER_STORAGE_KEY = 'sermon-rater-client-id';
+
+function getOrCreateRaterClientId(): string {
+  let id = localStorage.getItem(RATER_STORAGE_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(RATER_STORAGE_KEY, id);
+  }
+  return id;
+}
+
 interface Sermon {
   id: number;
   title: string;
   speaker: string;
   link: string;
   date: string;
-  views: number;
-  rating: number;
   tagsJson: string | null;
+  averageRating: number | null;
+  ratingCount: number;
+  yourStars: number | null;
+}
+
+function StarRatingRow({
+  yourStars,
+  disabled,
+  onRate
+}: {
+  yourStars: number | null;
+  disabled: boolean;
+  onRate: (stars: number) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Rate this sermon from 1 to 5 stars"
+      style={{ display: 'flex', gap: '0.15rem', alignItems: 'center', flexWrap: 'wrap' }}
+    >
+      {[1, 2, 3, 4, 5].map((n) => {
+        const filled = yourStars != null && n <= yourStars;
+        return (
+          <button
+            key={n}
+            type="button"
+            disabled={disabled}
+            aria-label={`${n} star${n === 1 ? '' : 's'}`}
+            aria-pressed={filled}
+            onClick={() => onRate(n)}
+            style={{
+              padding: '0.15rem 0.25rem',
+              fontSize: '1.25rem',
+              lineHeight: 1,
+              border: 'none',
+              background: 'transparent',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              color: filled ? 'rgb(234, 179, 8)' : 'rgb(203, 213, 225)',
+              opacity: disabled ? 0.6 : 1
+            }}
+          >
+            {filled ? '\u2605' : '\u2606'}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function SermonsPage() {
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [raterClientId, setRaterClientId] = useState<string | null>(null);
+  const [ratingBusyId, setRatingBusyId] = useState<number | null>(null);
 
   useEffect(() => {
+    const cid = getOrCreateRaterClientId();
+    setRaterClientId(cid);
+
     const fetchSermons = async () => {
       try {
-        const res = await fetch('/api/sermons');
+        const res = await fetch(`/api/sermons?clientId=${encodeURIComponent(cid)}`);
         const data = await res.json();
         const sermonList = data.list || [];
         
@@ -59,6 +120,55 @@ export default function SermonsPage() {
     checkAdmin();
   }, []);
 
+  const loadSermonsWithClient = async (cid: string) => {
+    const res = await fetch(`/api/sermons?clientId=${encodeURIComponent(cid)}`);
+    const data = await res.json();
+    const sermonList = data.list || [];
+    const seen = new Set<string>();
+    const deduped: Sermon[] = [];
+    for (const s of sermonList) {
+      const dayKey = new Date(s.date).toISOString().slice(0, 10);
+      if (!seen.has(dayKey)) {
+        seen.add(dayKey);
+        deduped.push(s);
+      }
+    }
+    setSermons(deduped);
+  };
+
+  const submitRating = async (sermonId: number, stars: number) => {
+    if (!raterClientId) return;
+    setRatingBusyId(sermonId);
+    try {
+      const res = await fetch('/api/sermons/rate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sermonId, stars, clientId: raterClientId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(typeof data.error === 'string' ? data.error : 'Could not save rating');
+        return;
+      }
+      setSermons((prev) =>
+        prev.map((s) =>
+          s.id === sermonId
+            ? {
+                ...s,
+                yourStars: data.yourStars ?? stars,
+                averageRating: data.averageRating ?? s.averageRating,
+                ratingCount: data.ratingCount ?? s.ratingCount
+              }
+            : s
+        )
+      );
+    } catch {
+      alert('Could not save rating');
+    } finally {
+      setRatingBusyId(null);
+    }
+  };
+
   const handleDelete = async (sermonId: number, sermonTitle: string) => {
     if (!window.confirm(`Are you sure you want to request deletion of sermon "${sermonTitle}"? This will require approval before the sermon is deleted.`)) {
       return;
@@ -68,20 +178,7 @@ export default function SermonsPage() {
       const res = await fetch(`/api/admin/sermons/${sermonId}`, { method: 'DELETE' });
       if (res.ok) {
         alert('Delete request submitted for approval');
-        // Refresh sermons list
-        const sermonsRes = await fetch('/api/sermons');
-        const sermonsData = await sermonsRes.json();
-        const sermonList = sermonsData.list || [];
-        const seen = new Set<string>();
-        const deduped: Sermon[] = [];
-        for (const s of sermonList) {
-          const dayKey = new Date(s.date).toISOString().slice(0, 10);
-          if (!seen.has(dayKey)) {
-            seen.add(dayKey);
-            deduped.push(s);
-          }
-        }
-        setSermons(deduped);
+        if (raterClientId) await loadSermonsWithClient(raterClientId);
       } else {
         const errorData = await res.json().catch(() => ({ error: 'Failed to submit delete request' }));
         alert(errorData.error || 'Failed to submit delete request');
@@ -188,14 +285,39 @@ export default function SermonsPage() {
                       day: 'numeric' 
                     })}
                   </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '1rem', 
-                    fontSize: '0.875rem',
-                    color: 'rgb(100, 116, 139)'
-                  }}>
-                    <span>👁️ {s.views} views</span>
-                    <span>⭐ {s.rating}/5</span>
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem',
+                      color: 'rgb(100, 116, 139)'
+                    }}
+                  >
+                    <div>
+                      {s.ratingCount === 0 ? (
+                        <span>No ratings yet</span>
+                      ) : (
+                        <span>
+                          <strong style={{ color: 'rgb(15, 23, 42)' }}>{s.averageRating}</strong> / 5 average ·{' '}
+                          {s.ratingCount} rating{s.ratingCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
+                      <StarRatingRow
+                        yourStars={s.yourStars}
+                        disabled={ratingBusyId === s.id}
+                        onRate={(n) => submitRating(s.id, n)}
+                      />
+                      {s.yourStars != null && (
+                        <span style={{ fontSize: '0.8125rem' }}>Your rating: {s.yourStars}</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'rgb(148, 163, 184)' }}>
+                      One rating per device; you can change your stars anytime.
+                    </span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>

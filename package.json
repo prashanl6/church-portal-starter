@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma migrate deploy && prisma generate && node scripts/migrate-legacy-people-event.js && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",

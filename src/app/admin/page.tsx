@@ -12,6 +12,7 @@ export default function AdminHome() {
           <Link className="btn-secondary" href="/admin/sermons">Sermons</Link>
           <Link className="btn-secondary" href="/admin/people">Birthdays & Anniversaries</Link>
           <Link className="btn-secondary" href="/admin/bookings">Bookings</Link>
+          <Link className="btn-secondary" href="/admin/church-bank-account">Church Bank Account Details</Link>
           <Link className="btn-secondary" href="/admin/medical">Medical Equipment</Link>
           <Link className="btn-secondary" href="/admin/processes">Processes</Link>
           <Link className="btn-secondary" href="/admin/audit">Audit Logs</Link>

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { requireRole, getUserFromCookie } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
+import { parseProcessAudience } from '@/lib/processAudience';
 
 export async function GET() {
   const u = requireRole(['admin', 'staff']);
@@ -11,9 +12,12 @@ export async function GET() {
   }
 
   try {
-    const list = await prisma.processDoc.findMany({ 
+    const list = await prisma.processDoc.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 100
+      take: 100,
+      include: {
+        attachments: { orderBy: { createdAt: 'asc' } },
+      },
     });
     return NextResponse.json({ list });
   } catch (error: any) {
@@ -33,19 +37,24 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { title, contentHtml } = body;
-    
+    const { title, contentHtml, audience } = body;
+
     if (!title || !contentHtml) {
       return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
+    }
+    const aud = parseProcessAudience(audience, 'Tag');
+    if (!aud.ok) {
+      return NextResponse.json({ error: aud.error }, { status: 400 });
     }
 
     const created = await prisma.processDoc.create({
       data: {
         title,
         contentHtml,
+        audience: aud.value,
         ownerUserId: u.id,
-        status: 'submitted'
-      }
+        status: 'submitted',
+      },
     });
 
     await submitApproval('process', created.id, 'publish', u.id);

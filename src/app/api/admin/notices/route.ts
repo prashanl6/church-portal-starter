@@ -2,10 +2,12 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
+import { hydrateNoticeBodiesWithPeopleSnapshot } from '@/lib/noticePeopleSnapshot';
 
 export async function GET() {
   const list = await prisma.notice.findMany({ orderBy: { weekOf: 'desc' }, take: 50 });
-  return NextResponse.json({ list });
+  const hydrated = await hydrateNoticeBodiesWithPeopleSnapshot(list);
+  return NextResponse.json({ list: hydrated });
 }
 
 export async function POST(req: Request) {

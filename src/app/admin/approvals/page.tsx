@@ -149,10 +149,25 @@ export default function ApprovalsPage() {
               <div className="flex-1">
                 <div className="font-semibold text-lg">{a.resourceType} #{a.resourceId}</div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Action: {a.action === 'confirm_payment' ? 'Confirm Payment' : a.action === 'approve' ? 'Approve Booking' : a.action === 'delete' && a.resourceType === 'booking' ? 'Delete Booking' : a.action} · Status: {a.status}
+                  Action:{' '}
+                  {a.action === 'confirm_payment'
+                    ? 'Confirm Payment'
+                    : a.action === 'approve'
+                      ? 'Approve Booking'
+                      : a.action === 'delete' && a.resourceType === 'booking'
+                        ? 'Delete Booking'
+                        : a.resourceType === 'church_bank_account' && a.action === 'update'
+                          ? 'Update church bank account'
+                          : a.action}{' '}
+                  · Status: {a.status}
                   {a.status === 'SUBMITTED' && !a.approver1 && (
                     <span className="ml-2 px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
-                      ⏳ Waiting for approval
+                      ⏳ Waiting for first approval
+                    </span>
+                  )}
+                  {a.status === 'SUBMITTED' && a.approver1 && !a.approver2 && (
+                    <span className="ml-2 px-2 py-1 rounded bg-amber-100 text-amber-900 text-xs font-medium">
+                      Waiting for second approval
                     </span>
                   )}
                   {a.status === 'APPROVED' && (
@@ -164,6 +179,7 @@ export default function ApprovalsPage() {
                         a.resourceType === 'booking' && a.action === 'approve' ? ' (pending payment)' :
                         a.resourceType === 'booking' && a.action === 'confirm_payment' ? ' (payment confirmed)' :
                         (a.resourceType === 'asset' || a.resourceType === 'notice' || a.resourceType === 'sermon' || a.resourceType === 'process' || a.resourceType === 'booking') && a.action === 'delete' ? ' and deleted' :
+                        a.resourceType === 'church_bank_account' && a.action === 'update' ? ' (bank details published)' :
                         ''
                       }
                     </span>
@@ -279,6 +295,16 @@ export default function ApprovalsPage() {
                   </div>
                 )}
 
+                {a.churchBankAccountDetails && (
+                  <div className="mt-2 text-sm space-y-1 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                    <div className="font-semibold text-slate-800">Church Bank Account Details (for booking emails)</div>
+                    <div><strong>Account number:</strong> {a.churchBankAccountDetails.accountNumber}</div>
+                    <div><strong>Account name:</strong> {a.churchBankAccountDetails.accountName}</div>
+                    <div><strong>Bank:</strong> {a.churchBankAccountDetails.bankName}</div>
+                    <div><strong>Branch:</strong> {a.churchBankAccountDetails.branch}</div>
+                  </div>
+                )}
+
                 {/* Sermon Details */}
                 {a.sermonDetails && (
                   <div className="mt-2 text-sm space-y-1">
@@ -383,6 +409,7 @@ export default function ApprovalsPage() {
                         <div>
                           <div className="font-semibold text-xs text-gray-500 mb-2">Current Values</div>
                           <div><strong>Title:</strong> {a.processDetails.title}</div>
+                          <div><strong>Tag:</strong> {a.processDetails.audience}</div>
                           <div><strong>Version:</strong> {a.processDetails.version}</div>
                           <div className="mt-2">
                             <strong>Content:</strong>
@@ -396,6 +423,7 @@ export default function ApprovalsPage() {
             <div>
                           <div className="font-semibold text-xs text-blue-600 mb-2">Proposed Changes</div>
                           <div><strong>Title:</strong> {a.processDetails.proposedChanges.title}</div>
+                          <div><strong>Tag:</strong> {a.processDetails.proposedChanges.audience ?? a.processDetails.audience}</div>
                           <div><strong>Version:</strong> {a.processDetails.version + 1}</div>
                           <div className="mt-2">
                             <strong>Content:</strong>
@@ -405,6 +433,16 @@ export default function ApprovalsPage() {
                               style={{ maxHeight: '100px', overflow: 'hidden' }}
                             />
                           </div>
+                          {a.processDetails.attachmentsToRemove && a.processDetails.attachmentsToRemove.length > 0 && (
+                            <div className="mt-2 text-xs">
+                              <strong className="text-red-800">Attachments to remove if approved:</strong>
+                              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                                {a.processDetails.attachmentsToRemove.map((att: { id: number; fileName: string }) => (
+                                  <li key={att.id}>{att.fileName}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : (

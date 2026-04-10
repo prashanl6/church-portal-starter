@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { hydrateNoticeBodiesWithPeopleSnapshot } from '@/lib/noticePeopleSnapshot';
 
 export async function GET() {
   const list = await prisma.approval.findMany({ 
@@ -10,6 +11,14 @@ export async function GET() {
       approver2: { select: { name: true, email: true } }
     }
   });
+
+  const noticeIds = [
+    ...new Set(list.filter((a) => a.resourceType === 'notice').map((a) => a.resourceId))
+  ];
+  const noticesRaw =
+    noticeIds.length > 0 ? await prisma.notice.findMany({ where: { id: { in: noticeIds } } }) : [];
+  const noticesHydrated = await hydrateNoticeBodiesWithPeopleSnapshot(noticesRaw);
+  const noticeById = new Map(noticesHydrated.map((n) => [n.id, n]));
   
   // Enrich with resource details based on resourceType
   const enrichedList = await Promise.all(list.map(async (approval) => {
@@ -40,7 +49,7 @@ export async function GET() {
       };
     }
     if (approval.resourceType === 'notice') {
-      const notice = await prisma.notice.findUnique({ where: { id: approval.resourceId } });
+      const notice = noticeById.get(approval.resourceId);
       // Notice might be null if it was already deleted (for delete approvals that were approved)
       return {
         ...approval,
@@ -105,9 +114,26 @@ export async function GET() {
         } : null)
       };
     }
+    if (approval.resourceType === 'church_bank_account') {
+      const proposal = await prisma.churchBankAccountProposal.findUnique({
+        where: { id: approval.resourceId }
+      });
+      return {
+        ...approval,
+        churchBankAccountDetails: proposal
+          ? {
+              accountNumber: proposal.accountNumber,
+              accountName: proposal.accountName,
+              bankName: proposal.bankName,
+              branch: proposal.branch,
+              proposalStatus: proposal.status
+            }
+          : null
+      };
+    }
     if (approval.resourceType === 'process') {
       const process = await prisma.processDoc.findUnique({ where: { id: approval.resourceId } });
-      
+
       // For update requests, parse the proposed changes from comment1
       let proposedChanges: any = null;
       if (approval.action === 'update' && approval.status === 'SUBMITTED' && approval.comment1) {
@@ -117,21 +143,44 @@ export async function GET() {
           // If parsing fails, comment1 might already contain approver comment
         }
       }
-      
+
+      let attachmentsToRemove: { id: number; fileName: string }[] = [];
+      const rmIds = proposedChanges?.removeAttachmentIds;
+      if (
+        process &&
+        Array.isArray(rmIds) &&
+        rmIds.length > 0 &&
+        approval.action === 'update' &&
+        approval.status === 'SUBMITTED'
+      ) {
+        const ids = [...new Set(rmIds.map((x: unknown) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+        if (ids.length) {
+          attachmentsToRemove = await prisma.processAttachment.findMany({
+            where: { processDocId: approval.resourceId, id: { in: ids } },
+            select: { id: true, fileName: true },
+          });
+        }
+      }
+
       // Process might be null if it was already deleted (for delete approvals that were approved)
       return {
         ...approval,
-        processDetails: process ? {
-          title: process.title,
-          contentHtml: process.contentHtml,
-          version: process.version,
-          status: process.status,
-          proposedChanges: proposedChanges // Include proposed changes for update requests
-        } : (approval.action === 'delete' ? {
-          // For approved deletions, process no longer exists, but we can show it was deleted
-          title: 'Process #' + approval.resourceId,
-          deleted: true
-        } : null)
+        processDetails: process
+          ? {
+              title: process.title,
+              contentHtml: process.contentHtml,
+              audience: process.audience,
+              version: process.version,
+              status: process.status,
+              proposedChanges: proposedChanges,
+              attachmentsToRemove,
+            }
+          : approval.action === 'delete'
+            ? {
+                title: 'Process #' + approval.resourceId,
+                deleted: true,
+              }
+            : null,
       };
     }
     return approval;

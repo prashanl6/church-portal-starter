@@ -67,17 +67,39 @@ model Asset {
   updatedAt     DateTime @updatedAt
 }
 
-model PeopleEvent {
-  id         Int      @id @default(autoincrement())
-  personName String
-  type       String // birthday, wedding_anniversary
-  date       DateTime
-  status     String   @default("active") // active, inactive
-  email      String?
-  phone      String?
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+/// People tracked for birthdays (and linkable as partners on anniversaries).
+model ChurchIndividual {
+  id           Int       @id @default(autoincrement())
+  displayName  String
+  birthDate    DateTime? // required for new individuals in API; optional for legacy placeholders
+  email        String?
+  phone        String?
+  notes        String?
+  dateOfDeath  DateTime?
+  status       String    @default("active") // active, inactive
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  anniversariesAsA WeddingAnniversary[] @relation("AnniversaryPersonA")
+  anniversariesAsB WeddingAnniversary[] @relation("AnniversaryPersonB")
+}
+
+/// Wedding anniversary linking two existing individuals (date + notes only).
+model WeddingAnniversary {
+  id              Int       @id @default(autoincrement())
+  individualAId   Int
+  individualBId   Int
+  anniversaryDate DateTime
+  notes           String?
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  individualA ChurchIndividual @relation("AnniversaryPersonA", fields: [individualAId], references: [id], onDelete: Restrict)
+  individualB ChurchIndividual @relation("AnniversaryPersonB", fields: [individualBId], references: [id], onDelete: Restrict)
+
+  @@index([individualAId])
+  @@index([individualBId])
 }
 
 model Notice {
@@ -97,25 +119,59 @@ model Sermon {
   date      DateTime
   dateOnly  DateTime
   link      String
-  views     Int       @default(0)
-  rating    Int       @default(0)
   status    String    @default("published")
   tagsJson  String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  ratings SermonRating[]
+
   @@unique([dateOnly])
 }
 
+/// One row per browser/client per sermon (clientId from localStorage). Stars 1–5.
+model SermonRating {
+  id        Int      @id @default(autoincrement())
+  sermonId  Int
+  clientId  String
+  stars     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sermon Sermon @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+
+  @@unique([sermonId, clientId])
+  @@index([sermonId])
+}
+
 model ProcessDoc {
-  id          Int      @id @default(autoincrement())
+  id          Int @id @default(autoincrement())
   title       String
   ownerUserId Int
   contentHtml String
-  version     Int      @default(1)
-  status      String   @default("draft")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  /// public = visible without login; steward = logged-in users only (on /processes)
+  audience    String              @default("public")
+  version     Int                 @default(1)
+  status      String              @default("draft")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  attachments ProcessAttachment[]
+
+  @@index([audience])
+}
+
+/// Excel / Word files linked to a process document (download from admin and public views).
+model ProcessAttachment {
+  id           Int        @id @default(autoincrement())
+  processDocId Int
+  fileName     String
+  storedPath   String
+  mimeType     String?
+  byteSize     Int?
+  createdAt    DateTime   @default(now())
+  processDoc   ProcessDoc @relation(fields: [processDocId], references: [id], onDelete: Cascade)
+
+  @@index([processDocId])
 }
 
 model Booking {
@@ -135,6 +191,34 @@ model Booking {
   slipUrl       String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+/// Singleton row (id = 1): hall hire price per 30-minute block.
+model HallBookingSettings {
+  id               Int      @id
+  ratePer30Minutes Float    @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+/// Singleton (id = 1): live church bank details for booking payment instructions (after dual approval).
+model ChurchBankAccount {
+  id            Int      @id
+  accountNumber String
+  accountName   String
+  bankName      String
+  branch        String
+  updatedAt     DateTime @updatedAt
+}
+
+/// Pending bank detail change; after one approval, values are copied to ChurchBankAccount (id 1).
+model ChurchBankAccountProposal {
+  id            Int      @id @default(autoincrement())
+  accountNumber String
+  accountName   String
+  bankName      String
+  branch        String
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt     DateTime @default(now())
 }
 
 model MedicalItem {

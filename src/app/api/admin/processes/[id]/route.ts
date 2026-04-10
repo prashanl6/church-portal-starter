@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
+import { parseProcessAudience } from '@/lib/processAudience';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const u = getUserFromCookie();
@@ -40,11 +41,49 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       }, { status: 400 });
     }
 
+    let removeAttachmentIds: number[] = [];
+    if (Array.isArray(body.removeAttachmentIds)) {
+      const raw = body.removeAttachmentIds as unknown[];
+      removeAttachmentIds = [
+        ...new Set(raw.map((x) => Number(x)).filter((n): n is number => Number.isFinite(n) && n > 0)),
+      ];
+    }
+    if (removeAttachmentIds.length) {
+      const found = await prisma.processAttachment.findMany({
+        where: { processDocId: id, id: { in: removeAttachmentIds } },
+        select: { id: true },
+      });
+      if (found.length !== removeAttachmentIds.length) {
+        return NextResponse.json(
+          { error: 'One or more attachments do not belong to this process' },
+          { status: 400 }
+        );
+      }
+    }
+
+    let nextAudience = existing.audience;
+    if (body.audience !== undefined) {
+      const aud = parseProcessAudience(body.audience, 'Tag');
+      if (!aud.ok) {
+        return NextResponse.json({ error: aud.error }, { status: 400 });
+      }
+      nextAudience = aud.value;
+    }
+
     // Store the update data as JSON in comment1 (temporarily, will be replaced with approver comment)
-    const updateData = {
+    const updateData: {
+      title: string;
+      contentHtml: string;
+      audience: string;
+      removeAttachmentIds?: number[];
+    } = {
       title: body.title !== undefined ? body.title : existing.title,
-      contentHtml: body.contentHtml !== undefined ? body.contentHtml : existing.contentHtml
+      contentHtml: body.contentHtml !== undefined ? body.contentHtml : existing.contentHtml,
+      audience: nextAudience,
     };
+    if (removeAttachmentIds.length) {
+      updateData.removeAttachmentIds = removeAttachmentIds;
+    }
 
     // Submit update for approval with update data stored in comment1 as JSON
     const approval = await prisma.approval.create({

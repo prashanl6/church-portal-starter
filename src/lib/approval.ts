@@ -1,5 +1,4 @@
 import { prisma } from './prisma';
-import { fetchFacebookViews } from './facebook';
 import bcrypt from 'bcryptjs';
 import { audit } from './audit';
 
@@ -45,7 +44,10 @@ export async function approve(resourceType: string, resourceId: number, approver
             status: 'APPROVED' 
           } 
         });
-        await prisma.notice.update({ where: { id: approval.resourceId }, data: { status: 'published' } });
+        await prisma.notice.update({
+          where: { id: approval.resourceId },
+          data: { status: 'published' }
+        });
         
         // Audit log with requestor and approver
         await audit(approverId, 'approve_notice', 'notice', approval.resourceId, 
@@ -68,29 +70,15 @@ export async function approve(resourceType: string, resourceId: number, approver
           } 
         });
         
-        // Try to fetch views from Facebook link when publishing
-        const sermon = await prisma.sermon.findUnique({ where: { id: approval.resourceId } });
-        let viewsUpdate: number | undefined = undefined;
-        if (sermon && sermon.link) {
-          try {
-            const fetched = await fetchFacebookViews(sermon.link);
-            if (typeof fetched === 'number') viewsUpdate = fetched;
-          } catch (e) {
-            // ignore facebook fetch errors
-          }
-        }
-        await prisma.sermon.update({ 
-          where: { id: approval.resourceId }, 
-          data: { 
-            status: 'published', 
-            ...(viewsUpdate !== undefined ? { views: viewsUpdate } : {}) 
-          } 
+        await prisma.sermon.update({
+          where: { id: approval.resourceId },
+          data: { status: 'published' }
         });
-        
+
         // Audit log with requestor and approver
         await audit(approverId, 'approve_sermon', 'sermon', approval.resourceId,
           { status: 'draft' },
-          { status: 'published', ...(viewsUpdate !== undefined ? { views: viewsUpdate } : {}) },
+          { status: 'published' },
           approval.submitterId,
           approverId
         );
@@ -295,15 +283,29 @@ export async function approve(resourceType: string, resourceId: number, approver
       }
       
       // Update the original process with the new data
+      const nextAudience =
+        updateData.audience === 'public' || updateData.audience === 'steward'
+          ? updateData.audience
+          : process.audience;
+
       await prisma.processDoc.update({
         where: { id: approval.resourceId },
         data: {
           title: updateData.title,
           contentHtml: updateData.contentHtml,
-          version: process.version + 1
-        }
+          audience: nextAudience,
+          version: process.version + 1,
+        },
       });
-      
+
+      const removeIds = Array.isArray(updateData.removeAttachmentIds)
+        ? updateData.removeAttachmentIds.map((x: unknown) => Number(x)).filter((n: number) => Number.isFinite(n) && n > 0)
+        : [];
+      if (removeIds.length) {
+        const { deleteProcessAttachmentsByIds } = await import('@/lib/processAttachmentFs');
+        await deleteProcessAttachmentsByIds(approval.resourceId, removeIds);
+      }
+
       // Update approval with approver comment (replacing the JSON data)
       const updated = await prisma.approval.update({ 
         where: { id: approval.id }, 
@@ -341,7 +343,9 @@ export async function approve(resourceType: string, resourceId: number, approver
         } 
       });
       
-      // Delete the process after approval
+      const { unlinkProcessAttachmentFiles } = await import('@/lib/processAttachmentFs');
+      await unlinkProcessAttachmentFiles(approval.resourceId);
+      // Delete the process after approval (attachments cascade in DB)
       await prisma.processDoc.delete({ where: { id: approval.resourceId } });
       
       // Audit log with requestor and approver
@@ -433,18 +437,21 @@ export async function approve(resourceType: string, resourceId: number, approver
         if (baseUrl.includes('BASE_URL=')) {
           baseUrl = baseUrl.split('BASE_URL=')[1] || 'http://localhost:3001';
         }
-        await sendBookingApprovalEmail({
-          bookingRef: booking.bookingRef,
-          requesterName: booking.requesterName,
-          email: booking.email,
-          phone: booking.phone,
-          hall: booking.hall,
-          date: booking.date.toISOString(),
-          startTime: booking.startTime,
-          endTime: booking.endTime,
-          purpose: booking.purpose,
-          amount: booking.amount || undefined,
-        }, baseUrl);
+        await sendBookingApprovalEmail(
+          {
+            bookingRef: booking.bookingRef,
+            requesterName: booking.requesterName,
+            email: booking.email,
+            phone: booking.phone,
+            hall: booking.hall,
+            date: booking.date.toISOString(),
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            purpose: booking.purpose,
+            amount: booking.amount || undefined
+          },
+          baseUrl
+        );
       } catch (emailError: any) {
         console.error('Error sending booking approval email:', emailError);
         // Don't fail the approval if email fails
@@ -482,17 +489,79 @@ export async function approve(resourceType: string, resourceId: number, approver
       
       return updated;
     }
-    
+
+    // Church bank account updates: single approval — publish live row and mark proposal approved
+    if (approval.resourceType === 'church_bank_account' && approval.action === 'update') {
+      const proposal = await prisma.churchBankAccountProposal.findUnique({
+        where: { id: approval.resourceId }
+      });
+      if (!proposal) throw new Error('Bank account proposal not found');
+      if (proposal.status !== 'PENDING') throw new Error('This proposal is no longer pending');
+      await prisma.churchBankAccount.upsert({
+        where: { id: 1 },
+        create: {
+          id: 1,
+          accountNumber: proposal.accountNumber,
+          accountName: proposal.accountName,
+          bankName: proposal.bankName,
+          branch: proposal.branch
+        },
+        update: {
+          accountNumber: proposal.accountNumber,
+          accountName: proposal.accountName,
+          bankName: proposal.bankName,
+          branch: proposal.branch
+        }
+      });
+      await prisma.churchBankAccountProposal.update({
+        where: { id: proposal.id },
+        data: { status: 'APPROVED' }
+      });
+      return prisma.approval.update({
+        where: { id: approval.id },
+        data: {
+          approver1Id: approverId,
+          comment1: comment,
+          status: 'APPROVED'
+        }
+      });
+    }
+
     // For any other resource types, still require dual approval (fallback)
     return prisma.approval.update({ where: { id: approval.id }, data: { approver1Id: approverId, comment1: comment } });
   }
   if (!approval.approver2Id) {
     if (approval.submitterId === approverId || approval.approver1Id === approverId) throw new Error('Approver must be distinct');
     const updated = await prisma.approval.update({ where: { id: approval.id }, data: { approver2Id: approverId, comment2: comment, status: 'APPROVED' } });
-    
-    // This section is only reached for resources that still require dual approval
-    // (Currently, all resources use single approval, so this is a fallback for future resources)
-    
+
+    if (approval.resourceType === 'church_bank_account') {
+      const proposal = await prisma.churchBankAccountProposal.findUnique({
+        where: { id: approval.resourceId }
+      });
+      if (!proposal) throw new Error('Bank account proposal not found');
+      if (proposal.status !== 'PENDING') throw new Error('This proposal is no longer pending');
+      await prisma.churchBankAccount.upsert({
+        where: { id: 1 },
+        create: {
+          id: 1,
+          accountNumber: proposal.accountNumber,
+          accountName: proposal.accountName,
+          bankName: proposal.bankName,
+          branch: proposal.branch
+        },
+        update: {
+          accountNumber: proposal.accountNumber,
+          accountName: proposal.accountName,
+          bankName: proposal.bankName,
+          branch: proposal.branch
+        }
+      });
+      await prisma.churchBankAccountProposal.update({
+        where: { id: proposal.id },
+        data: { status: 'APPROVED' }
+      });
+    }
+
     return updated;
   }
   return approval;
@@ -515,6 +584,13 @@ export async function reject(resourceType: string, resourceId: number, approverI
       comment1: comment 
     } 
   });
+
+  if (approval.resourceType === 'church_bank_account') {
+    await prisma.churchBankAccountProposal.updateMany({
+      where: { id: approval.resourceId, status: 'PENDING' },
+      data: { status: 'REJECTED' }
+    });
+  }
   
   // Audit log with requestor and approver for rejection
   await audit(approverId, `reject_${approval.resourceType}`, approval.resourceType, approval.resourceId,
