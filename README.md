@@ -2,6 +2,8 @@
 
 Minimal, fast, elder-friendly portal with RBAC, dual-approval, audit logs, and key modules scaffolded.
 
+**Deployment, end-user guidance, and ongoing operations:** see [HOSTING_AND_OPERATIONS.md](./HOSTING_AND_OPERATIONS.md).
+
 ## Quick Start
 ```bash
 npm install
@@ -24,7 +26,7 @@ Login via `/login`:
 - Audit log helper
 - Assets (Admin CRUD draft + submit for approval)
 - Notices (submit → dual-approve → publish flow; public list on `/notices`)
-- Sermons list + `/api/sermons/view` (rating=views)
+- Sermons list + star ratings (`/api/sermons/rate`)
 - Hall booking (public request + basic availability)
 - Extensible data models for PeopleEvents, Medical, Processes
 
