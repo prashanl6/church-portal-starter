@@ -1,8 +1,8 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/booking-auto-cancel",
-      "schedule": "*/1 * * * *"
-    }
-  ]
-}
+// {
+//   "crons": [
+//     {
+//       "path": "/api/cron/booking-auto-cancel",
+//       "schedule": "*/5 * * * *"
+//     }
+//   ]
+// }
