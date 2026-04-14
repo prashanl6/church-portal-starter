@@ -11,7 +11,7 @@ The **Church Portal** is a Next.js (App Router) web app with:
 - **Public pages**: home, weekly notices, sermons (with star ratings), process documents, hall booking requests.
 - **Staff area** (`/admin` and `/api/admin/*`): protected by login; roles are **`admin`** and **`staff`** (both can use the admin UI and APIs). **`guest`** users are not allowed into `/admin`.
 - **Dual approval**: many changes go through an **Approvals** queue; two approvers sign off before content goes live (pattern varies slightly by resource).
-- **SQLite + Prisma** by default (`DATABASE_URL` pointing at a file).
+- **PostgreSQL + Prisma** (`DATABASE_URL` connection string).
 
 ---
 
@@ -48,16 +48,16 @@ npm run start
 
 Ensure **`DATABASE_URL`** is valid on the build host **before** `npm run build`, because `prisma migrate deploy` runs during build.
 
-### 2.4 Database in production (important)
+### 2.4 Database (PostgreSQL)
 
-The project is configured for **SQLite** (`file:...`). That is fine for a **single server with a persistent disk** (VPS, dedicated Node host, Docker volume).
+The app uses **PostgreSQL**. Provision a database (Vercel Postgres, Neon, Supabase, RDS, a VPS install, etc.) and set **`DATABASE_URL`**:
 
-**Serverless platforms** (e.g. Vercel) use **ephemeral filesystems**: a SQLite file is not durable across deploys and can break under concurrent writes. For production on such platforms you should:
+- Typical local URL: `postgresql://USER:PASSWORD@localhost:5432/DBNAME?schema=public`
+- Many hosted providers require TLS: append **`?sslmode=require`** (or use their Prisma-specific connection string).
 
-- Switch Prisma to **PostgreSQL**, **MySQL**, or **Turso/libSQL**, update `schema.prisma` `datasource`, set a hosted `DATABASE_URL`, and run migrations against that database; **or**
-- Run the app on a **VM/container** with a persistent volume for the SQLite file.
+**Builds** run `prisma migrate deploy`, so the build environment must reach the database (Vercel: store `DATABASE_URL` in project env vars so the build step can connect).
 
-Plan backups and restore tests for whatever database you choose.
+Plan **backups** and restore tests.
 
 ### 2.5 Deploying on Vercel (if you use it)
 
@@ -65,7 +65,7 @@ Plan backups and restore tests for whatever database you choose.
 2. Add **all** variables from `.env.example` in the Vercel project **Settings → Environment Variables** (Production and Preview as needed).
 3. Set **`CRON_SECRET`** in production. Vercel Cron (see `vercel.json`) calls `/api/cron/booking-auto-cancel` **once per day at 00:00 UTC**; the route expects `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is set.
 4. Confirm **`NEXT_PUBLIC_BASE_URL`** and **`BASE_URL`** are your real public `https://` domain.
-5. Resolve **SQLite vs hosted DB** per §2.4 before relying on production data.
+5. Add a **PostgreSQL** `DATABASE_URL` (see §2.4). Preview deployments may use a separate database or the same, depending on your workflow.
 
 ### 2.6 File uploads
 
@@ -85,7 +85,7 @@ Booking and other notifications need a working SMTP configuration:
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Prisma connection string (SQLite file or other provider). |
+| `DATABASE_URL` | **PostgreSQL** connection string for Prisma (often `?schema=public`; hosted DBs may need `?sslmode=require`). |
 | `JWT_SECRET` | Signs auth cookies; use a long random string in production. |
 | `SMTP_*`, `FROM_EMAIL`, `FROM_NAME` | Outbound email. |
 | `NEXT_PUBLIC_BASE_URL` | Public site URL (browser-visible, e.g. links). |
@@ -196,7 +196,7 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 ### 7.5 Logs and monitoring
 
 - Watch hosting logs for **5xx** errors and failed cron runs.
-- Monitor disk usage if SQLite and uploads stay on one volume.
+- Monitor database size and connection limits on your Postgres plan; disk if you store many uploads on the same host.
 
 ### 7.6 Legal and privacy
 

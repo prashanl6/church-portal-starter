@@ -5,22 +5,41 @@ Minimal, fast, elder-friendly portal with RBAC, dual-approval, audit logs, and k
 **Deployment, end-user guidance, and ongoing operations:** see [HOSTING_AND_OPERATIONS.md](./HOSTING_AND_OPERATIONS.md).
 
 ## Quick Start
+
+You need a **PostgreSQL** database (local install, Docker, or a hosted free tier).
+
 ```bash
 npm install
 cp .env.example .env
-npx prisma migrate dev --name init
+# Edit .env: set DATABASE_URL, JWT_SECRET, and optional SMTP / BASE_URL
+
+npx prisma migrate dev
 npx prisma db seed
 npm run dev
 ```
 
+Example local DB with Docker:
+
+```bash
+docker run --name church-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=church_portal -p 5432:5432 -d postgres:16
+# Then in .env:
+# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/church_portal?schema=public"
+```
+
+### Upgrading from an older SQLite checkout
+
+The app now uses **PostgreSQL only**; old SQLite migration folders were replaced by one baseline migration. Point `DATABASE_URL` at a new (or existing empty) Postgres database, run `npx prisma migrate deploy` (or `migrate dev`), then `npx prisma db seed`. There is **no** automatic copy of data from SQLite.
+
 Login via `/login`:
+
 - admin1@example.com / Admin@123
 - admin2@example.com / Admin@123
 - staff@example.com / Staff@123
 
 ## What’s Included
+
 - Next.js (App Router) + Tailwind
-- Prisma + SQLite
+- Prisma + **PostgreSQL**
 - JWT auth (HttpOnly cookie), middleware-protected `/admin` routes
 - Generic approvals API (`/api/approvals`) and Approvals queue UI
 - Audit log helper
@@ -35,22 +54,23 @@ Login via `/login`:
 Email notifications are enabled for booking requests. To configure:
 
 1. Create a `.env` file in the root directory with the following:
+
    ```
-   DATABASE_URL="file:./prisma/dev.db"
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/church_portal?schema=public"
    JWT_SECRET="your-secret-key-here"
-   
+
    # Email Configuration (SMTP)
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
    SMTP_SECURE=false
-   SMTP_USER=prashan.bastiansz@gmail.com
+   SMTP_USER=your-email@gmail.com
    SMTP_PASS=your-app-password-here
-   FROM_EMAIL=prashan.bastiansz@gmail.com
+   FROM_EMAIL=your-email@gmail.com
    FROM_NAME=Church Portal
-   
+
    # Base URL for email links
-   NEXT_PUBLIC_BASE_URL=http://localhost:3001
-   BASE_URL=http://localhost:3001
+   NEXT_PUBLIC_BASE_URL=http://localhost:3000
+   BASE_URL=http://localhost:3000
    ```
 
 2. For Gmail, you'll need to:
@@ -61,6 +81,6 @@ Email notifications are enabled for booking requests. To configure:
 3. Update `NEXT_PUBLIC_BASE_URL` and `BASE_URL` to your production domain when deploying.
 
 ## Next Steps
-- Add WYSIWYG editor and image upload for Processes
+
 - Add anniversary reminder cron worker
 - Harden security for production (HTTPS, secrets, logging)

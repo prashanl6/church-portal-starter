@@ -1,6 +1,6 @@
 /**
- * Idempotent: migrates wedding_anniversary rows from _LegacyPeopleEvent, then drops the table.
- * Run after `prisma migrate deploy` (see migration20260410123000_church_individuals_anniversaries).
+ * Idempotent: migrates wedding_anniversary rows from _LegacyPeopleEvent (PostgreSQL only), then drops the table.
+ * Run after `prisma migrate deploy`. No-ops if DATABASE_URL is not PostgreSQL or the legacy table is absent.
  */
 const { PrismaClient } = require('@prisma/client');
 
@@ -20,11 +20,25 @@ function splitCoupleName(personName) {
   return { a: name, b: `${name} (partner)` };
 }
 
-async function main() {
-  const tables = await prisma.$queryRaw`
-    SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_LegacyPeopleEvent'
+async function legacyTableExists() {
+  const rows = await prisma.$queryRaw`
+    SELECT 1 AS x
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = '_LegacyPeopleEvent'
+    LIMIT 1
   `;
-  if (!Array.isArray(tables) || tables.length === 0) {
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+async function main() {
+  const url = process.env.DATABASE_URL || '';
+  if (!url.startsWith('postgresql:') && !url.startsWith('postgres:')) {
+    console.log('migrate-legacy-people-event: skip (DATABASE_URL is not PostgreSQL)');
+    return;
+  }
+
+  const exists = await legacyTableExists();
+  if (!exists) {
     return;
   }
 
@@ -45,8 +59,8 @@ async function main() {
         phone: r.phone || null,
         notes: null,
         dateOfDeath: r.dateOfDeath ? new Date(r.dateOfDeath) : null,
-        status
-      }
+        status,
+      },
     });
     const indB = await prisma.churchIndividual.create({
       data: {
@@ -56,8 +70,8 @@ async function main() {
         phone: null,
         notes: null,
         dateOfDeath: null,
-        status: 'active'
-      }
+        status: 'active',
+      },
     });
 
     await prisma.weddingAnniversary.create({
@@ -66,12 +80,12 @@ async function main() {
         individualBId: indB.id,
         anniversaryDate,
         notes: r.notes || null,
-        status
-      }
+        status,
+      },
     });
   }
 
-  await prisma.$executeRawUnsafe(`DROP TABLE "_LegacyPeopleEvent"`);
+  await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "_LegacyPeopleEvent"`);
 }
 
 main()
