@@ -223,9 +223,9 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 
 Deploying runs **migrations** but **not** the demo **seed**, so the `User` table is often **empty** and every login returns “Invalid credentials”.
 
-**Option A — Bootstrap API (quick)**  
+**Option A — Bootstrap (quick)**  
 1. In Vercel → Environment Variables, add **`BOOTSTRAP_ADMIN_SECRET`** (long random string). Redeploy.  
-2. Send a **single** POST (then remove the env var):
+2. Open **`/login`**: if the database has no users, a **First-time setup** form appears — enter the same secret plus name, email, and password — **or** send a **single** POST (then remove the env var):
 
 ```bash
 curl -sS -X POST "https://YOUR_DOMAIN.vercel.app/api/auth/bootstrap" \
