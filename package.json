@@ -10,7 +10,6 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "seed": "node -e \"require('./scripts/seed.js').seed()\"",
-    "db:import-sqlite": "node scripts/import-sqlite-to-postgres.cjs",
     "e2e": "npx playwright test"
   },
   "dependencies": {
@@ -32,8 +31,6 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "better-sqlite3": "^11.7.0",
-    "pg": "^8.13.1",
     "@playwright/test": "^1.36.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.6",

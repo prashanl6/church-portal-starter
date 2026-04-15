@@ -30,20 +30,6 @@ docker run --name church-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=church_
 
 The app now uses **PostgreSQL only**; old SQLite migration folders were replaced by one baseline migration. Point `DATABASE_URL` at a new (or existing empty) Postgres database, run `npx prisma migrate deploy` (or `migrate dev`), then `npx prisma db seed`. There is **no** automatic copy of data from SQLite.
 
-### Old SQLite data (`prisma/dev.db`) → PostgreSQL (local or Neon)
-
-The app now uses **PostgreSQL only**. If you still have a legacy **`prisma/dev.db`** from before the switch, you can **copy that data** (notices, sermons, processes, users, etc.) into the database your `DATABASE_URL` points at:
-
-1. In **`.env`**, keep **one** `DATABASE_URL` line (PostgreSQL). Remove or comment out any `file:./dev.db` line so tools don’t get confused.
-2. Ensure that database has the schema: `npx prisma migrate deploy`
-3. Run (this **deletes and replaces** all rows in those tables in the target Postgres with SQLite data — use a **dev** database or Neon branch if you must not touch production):
-
-```bash
-CONFIRM_IMPORT=1 npm run db:import-sqlite
-```
-
-Optional: `SQLITE_PATH=./prisma/other.db` if your file is not the default.
-
 Login via `/login`:
 
 - admin1@example.com / Admin@123
