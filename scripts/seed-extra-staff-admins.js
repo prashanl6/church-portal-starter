@@ -1,10 +1,17 @@
 /**
  * Upsert 2 extra admins + 2 extra staff (does not touch notices or other data).
  * Run: npm run seed:extra-users
- * Requires DATABASE_URL in .env or environment.
+ * Loads .env from project root (last DATABASE_URL wins if duplicated).
  */
+require('./load-env-from-dotenv').loadEnvFromProjectRoot();
+
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is missing. Add it to .env in the project root.');
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 
