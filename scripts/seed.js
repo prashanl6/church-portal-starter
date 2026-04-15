@@ -21,7 +21,11 @@ async function seed() {
   const users = [
     { name: 'Admin One', email: 'admin1@example.com', role: 'admin', password: 'Admin@123' },
     { name: 'Admin Two', email: 'admin2@example.com', role: 'admin', password: 'Admin@123' },
+    { name: 'Admin Three', email: 'admin3@example.com', role: 'admin', password: 'Admin@123' },
+    { name: 'Admin Four', email: 'admin4@example.com', role: 'admin', password: 'Admin@123' },
     { name: 'Staff', email: 'staff@example.com', role: 'staff', password: 'Staff@123' },
+    { name: 'Staff Two', email: 'staff2@example.com', role: 'staff', password: 'Staff@123' },
+    { name: 'Staff Three', email: 'staff3@example.com', role: 'staff', password: 'Staff@123' },
   ];
   for (const u of users) {
     const hash = await bcrypt.hash(u.password, 10);

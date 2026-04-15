@@ -30,11 +30,12 @@ docker run --name church-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=church_
 
 The app now uses **PostgreSQL only**; old SQLite migration folders were replaced by one baseline migration. Point `DATABASE_URL` at a new (or existing empty) Postgres database, run `npx prisma migrate deploy` (or `migrate dev`), then `npx prisma db seed`. There is **no** automatic copy of data from SQLite.
 
-Login via `/login`:
+Login via `/login` (after `npx prisma db seed`):
 
-- admin1@example.com / Admin@123
-- admin2@example.com / Admin@123
-- staff@example.com / Staff@123
+- **Admins:** admin1@example.com … admin4@example.com — password `Admin@123`
+- **Staff:** staff@example.com, staff2@example.com, staff3@example.com — password `Staff@123`
+
+To add only the **extra** admin3, admin4, staff2, staff3 accounts without re-running the full seed (which resets demo notices): `npm run seed:extra-users`
 
 ## What’s Included
 

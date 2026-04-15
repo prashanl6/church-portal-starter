@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "seed": "node -e \"require('./scripts/seed.js').seed()\"",
+    "seed:extra-users": "node scripts/seed-extra-staff-admins.js",
     "e2e": "npx playwright test"
   },
   "dependencies": {
