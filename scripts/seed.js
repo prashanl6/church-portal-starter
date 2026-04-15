@@ -1,4 +1,4 @@
-require('./load-env-from-dotenv').loadEnvFromProjectRoot();
+require('./load-env-from-dotenv.cjs').loadEnvFromProjectRoot();
 
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');

@@ -3,7 +3,7 @@
  * Run: npm run seed:extra-users
  * Loads .env from project root (last DATABASE_URL wins if duplicated).
  */
-require('./load-env-from-dotenv').loadEnvFromProjectRoot();
+require('./load-env-from-dotenv.cjs').loadEnvFromProjectRoot();
 
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
