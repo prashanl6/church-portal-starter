@@ -36,7 +36,7 @@ const skipMigrations =
 
 // Report whether the database is reachable (never prints the password). Informational only.
 try {
-  execSync('node scripts/db-check.js', { stdio: 'inherit', env: { ...process.env, DB_CHECK_VARIANTS: process.env.VERCEL_ENV === 'preview' ? '1' : '' } });
+  execSync('node scripts/db-check.js', { stdio: 'inherit' });
 } catch {
   console.log('Database check reported a problem (details above).');
 }
