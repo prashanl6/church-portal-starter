@@ -42,15 +42,35 @@ async function main() {
   });
   console.log(`[db-check] TCP ${port}: ${tcp}`);
 
-  try {
-    execSync('npx prisma db execute --stdin --schema prisma/schema.prisma', { input: 'SELECT 1;', stdio: ['pipe', 'pipe', 'pipe'], timeout: 60000 });
-    console.log('[db-check] SELECT 1 ok — database reachable.');
-    return 0;
-  } catch (e) {
-    const out = `${e.stdout || ''}${e.stderr || ''}`.replace(/postgres(ql)?:\/\/[^\s'"`]+/g, '<url>');
-    console.log(`[db-check] SELECT 1 failed:\n${out.trim().split('\n').slice(0, 8).join('\n')}`);
-    return 1;
+  const trySelect = (label, dbUrl) => {
+    try {
+      execSync('npx prisma db execute --stdin --schema prisma/schema.prisma', {
+        input: 'SELECT 1;',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 60000,
+        env: { ...process.env, DATABASE_URL: dbUrl },
+      });
+      console.log(`[db-check] SELECT 1 ok (${label}).`);
+      return true;
+    } catch (e) {
+      const out = `${e.stdout || ''}${e.stderr || ''}`.replace(/postgres(ql)?:\/\/[^\s'"`]+/g, '<url>');
+      console.log(`[db-check] SELECT 1 failed (${label}): ${out.trim().split('\n').slice(0, 4).join(' | ')}`);
+      return false;
+    }
+  };
+  if (trySelect('as configured', raw)) return 0;
+  if (process.env.DB_CHECK_VARIANTS === '1') {
+    const noCb = new URL(raw);
+    noCb.searchParams.delete('channel_binding');
+    trySelect('without channel_binding', noCb.toString());
+    const v4 = (await dns.lookup(url.hostname, { family: 4 })).address;
+    const byIp = new URL(noCb.toString());
+    const endpoint = url.hostname.split('.')[0].replace(/-pooler$/, '');
+    byIp.hostname = v4;
+    byIp.searchParams.set('options', `endpoint=${endpoint}`);
+    trySelect('IPv4 address + endpoint option', byIp.toString());
   }
+  return 1;
 }
 
 main().then((code) => process.exit(code));
