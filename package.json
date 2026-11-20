@@ -15,6 +15,7 @@
     "seed:reference": "node scripts/seed-reference-data.js"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "@prisma/client": "^5.19.1",
     "@tailwindcss/typography": "^0.5.19",
     "@types/nodemailer": "^7.0.4",
