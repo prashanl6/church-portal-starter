@@ -16,7 +16,8 @@ export function getJwtSecret(): string {
   const s = process.env.JWT_SECRET;
   if (s && s.length >= 16 && s !== 'your-secret-key-here') return s;
   if (process.env.NODE_ENV === 'production') {
-    const db = process.env.DATABASE_URL;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const db = (require('./databaseUrl.js') as { resolveDatabaseUrl: () => string | undefined }).resolveDatabaseUrl();
     if (!db) throw new Error('Set JWT_SECRET (or DATABASE_URL) in production.');
     return createHash('sha256').update(`church-portal-jwt:${db}`).digest('hex');
   }

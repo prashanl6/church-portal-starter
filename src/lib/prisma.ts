@@ -1,10 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { resolveDatabaseUrl } = require('./databaseUrl.js') as { resolveDatabaseUrl: () => string | undefined };
 
 const globalForPrisma = globalThis as typeof globalThis & { prisma?: PrismaClient };
 
 function createPrismaClient(): PrismaClient {
+  const url = resolveDatabaseUrl();
   return new PrismaClient({
-    log: ['warn', 'error']
+    log: ['warn', 'error'],
+    ...(url ? { datasourceUrl: url } : {}),
   });
 }
 

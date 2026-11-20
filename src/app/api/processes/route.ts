@@ -22,9 +22,10 @@ export async function GET() {
     // Each process has an owner (requirement); show their name, not their id.
     const owners = await prisma.user.findMany({
       where: { id: { in: [...new Set(list.map((p) => p.ownerUserId))] } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, email: true },
     });
-    const ownerName = new Map(owners.map((o) => [o.id, o.name]));
+    // Guides added by the system (initial reference data) belong to the church office.
+    const ownerName = new Map(owners.map((o) => [o.id, o.email === 'system@church.local' ? 'Church office' : o.name]));
 
     return NextResponse.json({
       list: list.map((p) => ({
