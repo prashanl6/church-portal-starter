@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
+import { sanitizeRichHtml } from '@/lib/sanitizeHtml';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,13 +13,26 @@ export async function GET() {
         status: 'published',
         ...(user ? {} : { audience: 'public' }),
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
       include: {
-        attachments: { orderBy: { createdAt: 'asc' } },
+        attachments: { where: { status: 'active' }, orderBy: { createdAt: 'asc' } },
       },
     });
 
-    return NextResponse.json({ list });
+    // Each process has an owner (requirement); show their name, not their id.
+    const owners = await prisma.user.findMany({
+      where: { id: { in: [...new Set(list.map((p) => p.ownerUserId))] } },
+      select: { id: true, name: true },
+    });
+    const ownerName = new Map(owners.map((o) => [o.id, o.name]));
+
+    return NextResponse.json({
+      list: list.map((p) => ({
+        ...p,
+        ownerName: ownerName.get(p.ownerUserId) || null,
+        contentHtml: sanitizeRichHtml(p.contentHtml),
+      })),
+    });
   } catch (error) {
     console.error('Error fetching processes:', error);
     return NextResponse.json({ list: [], error: 'Failed to fetch processes' }, { status: 500 });

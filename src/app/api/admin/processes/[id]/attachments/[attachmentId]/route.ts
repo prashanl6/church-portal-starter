@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { join } from 'path';
-import { unlink } from 'fs/promises';
 import { getUserFromCookie } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { deleteProcessAttachmentsByIds } from '@/lib/processAttachmentFs';
+import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,13 +32,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
     }
 
-    await prisma.processAttachment.delete({ where: { id: attachmentId } });
-    const rel = att.storedPath.replace(/^\//, '');
-    try {
-      await unlink(join(process.cwd(), 'public', rel));
-    } catch {
-      /* ignore */
+    const doc = await prisma.processDoc.findUnique({ where: { id: processDocId } });
+    // Removing a live file from a published document needs approval (use Edit → Remove).
+    if (doc?.status === 'published' && att.status === 'active') {
+      return NextResponse.json(
+        { error: 'This document is published. To remove a file, click Edit, tick Remove next to the file and submit for approval.' },
+        { status: 400 }
+      );
     }
+    await deleteProcessAttachmentsByIds(processDocId, [attachmentId]);
+    await audit(u.id, 'remove_process_attachment', 'process', processDocId, { fileName: att.fileName }, null);
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

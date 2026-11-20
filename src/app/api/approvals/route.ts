@@ -1,16 +1,31 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { hydrateNoticeBodiesWithPeopleSnapshot } from '@/lib/noticePeopleSnapshot';
+import { guardStaffOrAdmin } from '@/lib/auth';
+import { readPayload } from '@/lib/approval';
+import { storedFileUrl } from '@/lib/storedFiles';
+
+function fmtDate(v: unknown) {
+  if (!v) return '—';
+  const d = new Date(String(v));
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 export async function GET() {
+  const g = guardStaffOrAdmin();
+  if ('response' in g) return g.response;
+  const me = g.user;
   const list = await prisma.approval.findMany({ 
     orderBy: { createdAt: 'desc' }, 
-    take: 50,
+    take: 200,
     include: {
       approver1: { select: { name: true, email: true } },
       approver2: { select: { name: true, email: true } }
     }
   });
+  const submitterIds = [...new Set(list.map((a) => a.submitterId))];
+  const submitters = await prisma.user.findMany({ where: { id: { in: submitterIds } }, select: { id: true, name: true, email: true } });
+  const submitterById = new Map(submitters.map((s) => [s.id, s]));
 
   const noticeIds = [
     ...new Set(list.filter((a) => a.resourceType === 'notice').map((a) => a.resourceId))
@@ -21,7 +36,16 @@ export async function GET() {
   const noticeById = new Map(noticesHydrated.map((n) => [n.id, n]));
   
   // Enrich with resource details based on resourceType
-  const enrichedList = await Promise.all(list.map(async (approval) => {
+  const enrichedList = await Promise.all(list.map(async (approvalRow) => {
+    const submitter = submitterById.get(approvalRow.submitterId);
+    const approval = {
+      ...approvalRow,
+      submitter: submitter ? { name: submitter.name, email: submitter.email } : null,
+      // Only a different admin may act; staff only view.
+      canAct: approvalRow.status === 'SUBMITTED' && me.role === 'admin' && approvalRow.submitterId !== me.id,
+      isMine: approvalRow.submitterId === me.id,
+    };
+    const payload = readPayload(approvalRow);
     if (approval.resourceType === 'booking') {
       const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
       // Booking might be null if it was already deleted (for delete approvals that were approved)
@@ -40,7 +64,7 @@ export async function GET() {
           status: booking.status,
           amount: booking.amount,
           paymentRef: booking.paymentRef,
-          slipUrl: booking.slipUrl
+          slipUrl: booking.slipFileId ? storedFileUrl(booking.slipFileId) : booking.slipUrl
         } : (approval.action === 'delete' ? {
           // For approved deletions, booking no longer exists, but we can show it was deleted
           bookingRef: 'Booking #' + approval.resourceId,
@@ -87,14 +111,7 @@ export async function GET() {
       const asset = await prisma.asset.findUnique({ where: { id: approval.resourceId } });
       
       // For update requests, parse the proposed changes from comment1
-      let proposedChanges: any = null;
-      if (approval.action === 'update' && approval.status === 'SUBMITTED' && approval.comment1) {
-        try {
-          proposedChanges = JSON.parse(approval.comment1);
-        } catch (e) {
-          // If parsing fails, comment1 might already contain approver comment
-        }
-      }
+      const proposedChanges: any = approval.action === 'update' ? payload : null;
       
       // Asset might be null if it was already deleted (for delete approvals that were approved)
       return {
@@ -135,14 +152,7 @@ export async function GET() {
       const process = await prisma.processDoc.findUnique({ where: { id: approval.resourceId } });
 
       // For update requests, parse the proposed changes from comment1
-      let proposedChanges: any = null;
-      if (approval.action === 'update' && approval.status === 'SUBMITTED' && approval.comment1) {
-        try {
-          proposedChanges = JSON.parse(approval.comment1);
-        } catch (e) {
-          // If parsing fails, comment1 might already contain approver comment
-        }
-      }
+      const proposedChanges: any = approval.action === 'update' ? payload : null;
 
       let attachmentsToRemove: { id: number; fileName: string }[] = [];
       const rmIds = proposedChanges?.removeAttachmentIds;
@@ -183,8 +193,62 @@ export async function GET() {
             : null,
       };
     }
+    if (approval.resourceType === 'individual') {
+      const current = approval.resourceId ? await prisma.churchIndividual.findUnique({ where: { id: approval.resourceId } }) : null;
+      const p = payload || {};
+      const rows: [string, string][] = [];
+      const name = p.displayName ?? current?.displayName ?? '—';
+      rows.push(['Name', String(name)]);
+      if (p.birthDate !== undefined) rows.push(['Date of birth', fmtDate(p.birthDate)]);
+      if (p.dateOfDeath !== undefined) rows.push(['Date of death', p.dateOfDeath ? fmtDate(p.dateOfDeath) : '(cleared)']);
+      if (p.status !== undefined) rows.push(['Status', p.status === 'inactive' ? 'Inactive (deceased)' : 'Active']);
+      if (p.email !== undefined) rows.push(['Email', p.email || '—']);
+      if (p.phone !== undefined) rows.push(['Phone', p.phone || '—']);
+      if (p.notes !== undefined) rows.push(['Notes', p.notes || '—']);
+      return {
+        ...approval,
+        genericDetails: {
+          heading: approval.action === 'create' ? 'Add a person to the register' : `Change details for ${current?.displayName ?? 'person'}`,
+          rows,
+        },
+      };
+    }
+    if (approval.resourceType === 'anniversary') {
+      const p = payload || {};
+      const current = approval.resourceId
+        ? await prisma.weddingAnniversary.findUnique({ where: { id: approval.resourceId }, include: { individualA: true, individualB: true } })
+        : null;
+      const ids = [p.individualAId, p.individualBId].filter(Boolean).map(Number);
+      const people = ids.length ? await prisma.churchIndividual.findMany({ where: { id: { in: ids } } }) : [];
+      const nameOf = (id: unknown, fallback?: string) => people.find((x) => x.id === Number(id))?.displayName ?? fallback ?? '—';
+      const rows: [string, string][] = [
+        ['Couple', `${nameOf(p.individualAId, current?.individualA.displayName)} & ${nameOf(p.individualBId, current?.individualB.displayName)}`],
+      ];
+      if (p.anniversaryDate !== undefined) rows.push(['Wedding date', fmtDate(p.anniversaryDate)]);
+      if (p.status !== undefined) rows.push(['Status', p.status]);
+      if (p.notes !== undefined) rows.push(['Notes', p.notes || '—']);
+      return {
+        ...approval,
+        genericDetails: { heading: approval.action === 'create' ? 'Add a wedding anniversary' : 'Change a wedding anniversary', rows },
+      };
+    }
+    if (approval.resourceType === 'hall_settings') {
+      const current = await prisma.hallBookingSettings.findUnique({ where: { id: 1 } });
+      return {
+        ...approval,
+        genericDetails: {
+          heading: 'Change the hall hire rate',
+          rows: [
+            ['Current rate (per 30 minutes)', `LKR ${(current?.ratePer30Minutes ?? 0).toLocaleString()}`],
+            ['New rate (per 30 minutes)', `LKR ${Number(payload?.ratePer30Minutes ?? 0).toLocaleString()}`],
+          ],
+        },
+      };
+    }
     return approval;
   }));
   
   return NextResponse.json({ list: enrichedList });
 }
+
+export const dynamic = 'force-dynamic';

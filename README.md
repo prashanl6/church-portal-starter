@@ -42,7 +42,9 @@ To add only the **extra** admin3, admin4, staff2, staff3 accounts without re-run
 - Next.js (App Router) + Tailwind
 - Prisma + **PostgreSQL**
 - JWT auth (HttpOnly cookie), middleware-protected `/admin` routes
-- Generic approvals API (`/api/approvals`) and Approvals queue UI
+- **Maker–checker approvals** (`src/lib/approval.ts`): one admin submits a change and a *different* admin approves it before it goes live. Staff can view but never approve. Covers assets, notices, sermons, process documents, the birthday/anniversary register, the hall hire rate, church bank details and hall bookings. Every request, approval and rejection is in the audit log.
+- Uploaded files (payment slips, process attachments) are stored **in PostgreSQL** and served through `/api/files/[id]` with permission checks, so they survive redeploys on Vercel and are never public by URL.
+- Logins lock for 15 minutes after 5 wrong passwords. In production, set a long random `JWT_SECRET`; if it is missing, a key derived from `DATABASE_URL` is used (never a guessable default).
 - Audit log helper
 - Assets (Admin CRUD draft + submit for approval)
 - Notices (submit → dual-approve → publish flow; public list on `/notices`)
@@ -79,7 +81,22 @@ Email notifications are enabled for booking requests. To configure:
    - Generate an App Password: https://myaccount.google.com/apppasswords
    - Use the App Password (not your regular password) in `SMTP_PASS`
 
-3. Update `NEXT_PUBLIC_BASE_URL` and `BASE_URL` to your production domain when deploying.
+3. On Vercel, `BASE_URL` defaults to the project's production address; set it only if you use a custom domain. Without `SMTP_USER`/`SMTP_PASS` the site works but sends no emails; people use the booking link shown on screen instead.
+
+## Running the tests
+
+`npm test` runs the whole test plan (54 cases, SEC-01 to PRF-01) against a running local site:
+
+```bash
+npm run build && npm start      # in one terminal
+npm test                        # in another
+```
+
+Run it on a freshly seeded **local** test database (`npm run seed`, `npm run seed:extra-users`, `npm run seed:reference`). It refuses to run against anything but localhost, creates test records and locks `staff3@example.com` for 15 minutes.
+
+## Reference data
+
+`npm run seed:reference` adds what a new site needs: the hall rate (LKR 1,500 per 30 minutes), ten process guides (two with Excel templates) and a welcome notice. It only adds what is missing and never changes what admins have set. Production builds run it automatically.
 
 ## Next Steps
 

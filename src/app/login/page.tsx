@@ -1,9 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { IconCross } from '@/components/Icons';
+
+// Demo accounts are pre-filled only on a developer's machine, never on the live site.
+const DEV = process.env.NODE_ENV !== 'production';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin1@example.com');
-  const [password, setPassword] = useState('Admin@123');
+  const [email, setEmail] = useState(DEV ? 'admin1@example.com' : '');
+  const [password, setPassword] = useState(DEV ? 'Admin@123' : '');
   const [showPassword, setShowPassword] = useState(false);
   const [msg, setMsg] = useState('');
   const [msgDetail, setMsgDetail] = useState('');
@@ -44,15 +48,12 @@ export default function LoginPage() {
       body: JSON.stringify({ email, password }),
     });
     if (res.ok) {
-      setMsg('Logged in. Go to Admin → Approvals.');
-      window.location.href = '/admin';
+      setMsg('Logged in. Taking you to the admin area…');
+      const next = new URLSearchParams(window.location.search).get('next') || '';
+      window.location.href = next.startsWith('/admin') ? next : '/admin';
     } else {
-      setMsg('Invalid email or password.');
-      setMsgDetail(
-        'Demo accounts (e.g. admin1@example.com) only exist if this database was seeded. ' +
-          'A fresh Vercel deploy usually has no users — use First-time setup below (if shown), run `npx prisma db seed` ' +
-          'with your production DATABASE_URL, or see HOSTING_AND_OPERATIONS.md.'
-      );
+      const data = await res.json().catch(() => ({}));
+      setMsg(typeof data.message === 'string' ? data.message : 'The email or password is not correct. Please try again.');
     }
   };
 
@@ -88,18 +89,18 @@ export default function LoginPage() {
   };
 
   const infoStyle: React.CSSProperties = {
-    fontSize: '0.8125rem',
-    color: 'rgb(100, 116, 139)',
-    lineHeight: 1.5,
+    fontSize: '1rem',
+    color: 'var(--text-2)',
+    lineHeight: 1.55,
     marginBottom: '1rem',
-    padding: '0.75rem',
-    background: 'rgb(248, 250, 252)',
-    borderRadius: '0.5rem',
-    border: '1px solid rgb(226, 232, 240)',
+    padding: '0.9rem 1rem',
+    background: 'var(--bg)',
+    borderRadius: 'var(--radius-sm)',
+    border: '1px solid var(--line)',
   };
 
   return (
-    <div style={{ maxWidth: '28rem', marginLeft: 'auto', marginRight: 'auto' }}>
+    <div style={{ maxWidth: '30rem', marginLeft: 'auto', marginRight: 'auto', paddingTop: '1.5rem' }}>
       {bootstrapEligible && (
         <div className="card" style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 0, marginBottom: '0.5rem' }}>
@@ -111,8 +112,8 @@ export default function LoginPage() {
           </p>
           <form onSubmit={onBootstrap} style={{ display: 'grid', gap: '0.75rem' }}>
             <div>
-              <label className="label">Bootstrap secret (same as in Vercel env)</label>
-              <input
+              <label className="label" htmlFor="login-field-1">Bootstrap secret (same as in Vercel env)</label>
+              <input id="login-field-1"
                 className="input"
                 type="password"
                 autoComplete="off"
@@ -122,12 +123,12 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="label">Your name</label>
-              <input className="input" value={bootstrapName} onChange={(e) => setBootstrapName(e.target.value)} required />
+              <label className="label" htmlFor="login-field-2">Your name</label>
+              <input id="login-field-2" className="input" value={bootstrapName} onChange={(e) => setBootstrapName(e.target.value)} required />
             </div>
             <div>
-              <label className="label">Email (login)</label>
-              <input
+              <label className="label" htmlFor="login-field-3">Email (login)</label>
+              <input id="login-field-3"
                 className="input"
                 type="email"
                 autoComplete="email"
@@ -137,8 +138,8 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="label">Password (min. 8 characters)</label>
-              <input
+              <label className="label" htmlFor="login-field-4">Password (min. 8 characters)</label>
+              <input id="login-field-4"
                 className="input"
                 type="password"
                 autoComplete="new-password"
@@ -171,26 +172,33 @@ export default function LoginPage() {
         </div>
       )}
 
-      <div className="card">
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginTop: 0, marginBottom: '0.75rem' }}>Staff Login</h1>
-        <p style={infoStyle}>
-          After a new deployment, the database often has <strong>no users</strong> until you seed it or complete
-          first-time setup. The prefilled demo email/password only work if that database was seeded.
-        </p>
-        <form onSubmit={onSubmit} style={{ display: 'grid', gap: '0.75rem' }}>
+      <div className="card" style={{ padding: '2.5rem 2rem', boxShadow: 'var(--shadow-2)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+          <span
+            className="brand-mark"
+            style={{ width: 60, height: 60, borderRadius: 18, margin: '0 auto 1.1rem', animation: 'fadeInUp 1s var(--ease) both' }}
+          >
+            <IconCross size={30} />
+          </span>
+          <h1 className="page-title" style={{ fontSize: '2rem', margin: '0 0 0.4rem' }}>Staff login</h1>
+          <p style={{ color: 'var(--text-2)', margin: 0 }}>For church administrators and staff.</p>
+        </div>
+        <form onSubmit={onSubmit} style={{ display: 'grid', gap: '1.1rem' }}>
           <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <label className="label" htmlFor="login-email">Email</label>
+            <input id="login-email" className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div>
-            <label className="label">Password</label>
+            <label className="label" htmlFor="login-password">Password</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input
+                id="login-password"
                 className="input"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{ paddingRight: '2.5rem' }}
+                style={{ paddingRight: '3.5rem' }}
                 required
               />
               <button
@@ -198,23 +206,19 @@ export default function LoginPage() {
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: 'absolute',
-                  right: '0.75rem',
+                  right: '0.4rem',
+                  width: '44px',
+                  height: '44px',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: '0.5rem',
+                  padding: 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'rgb(100, 116, 139)',
-                  transition: 'color 0.2s',
+                  color: 'var(--text-3)',
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'rgb(37, 99, 235)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'rgb(100, 116, 139)';
-                }}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
@@ -240,18 +244,19 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-          <button className="btn" type="submit" style={{ marginTop: '0.5rem' }}>
-            Login
+          <button className="btn" type="submit" style={{ marginTop: '0.5rem', width: '100%' }}>
+            Log in
           </button>
           {msg && (
             <div
+              role="alert"
               style={{
-                marginTop: '1rem',
-                padding: '0.75rem',
-                backgroundColor: msg.includes('Logged') ? 'rgb(240, 253, 244)' : 'rgb(254, 242, 242)',
+                padding: '0.9rem 1rem',
+                backgroundColor: msg.includes('Logged') ? 'var(--success-soft)' : 'var(--danger-soft)',
                 color: msg.includes('Logged') ? 'rgb(22, 101, 52)' : 'rgb(127, 29, 29)',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '1rem',
+                animation: 'fadeInUp 0.5s var(--ease) both',
                 border: `1px solid ${msg.includes('Logged') ? 'rgb(187, 247, 208)' : 'rgb(254, 205, 211)'}`,
               }}
             >

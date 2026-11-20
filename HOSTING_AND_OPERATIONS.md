@@ -39,7 +39,7 @@ Default app URL is often `http://localhost:3000` unless you use another port; al
 
 ### 2.3 Production build
 
-The `build` script runs migrations, generates the Prisma client, a small legacy data helper, then `next build`:
+The `build` script (`scripts/build.js`) runs migrations, generates the Prisma client, a small legacy data helper, then `next build`:
 
 ```bash
 npm run build
@@ -48,6 +48,10 @@ npm run start
 
 Ensure **`DATABASE_URL`** is valid on the build host **before** `npm run build`, because `prisma migrate deploy` runs during build.
 
+**Only production builds touch the database.** On Vercel, preview builds (`VERCEL_ENV=preview` or `development`) skip `prisma migrate deploy` and the legacy helper, so a branch can never change the live database. They compile without a database connection. Builds outside Vercel run migrations unless you set `SKIP_DB_MIGRATIONS=1`.
+
+Preview deployments still **use** whatever `DATABASE_URL` they are given while running. If it points at the live database, anyone testing a preview writes real data. Give the **Preview** environment its own database (for example a Neon branch) in Vercel → Settings → Environment Variables.
+
 ### 2.4 Database (PostgreSQL)
 
 The app uses **PostgreSQL**. Provision a database (Vercel Postgres, Neon, Supabase, RDS, a VPS install, etc.) and set **`DATABASE_URL`**:
@@ -55,7 +59,7 @@ The app uses **PostgreSQL**. Provision a database (Vercel Postgres, Neon, Supaba
 - Typical local URL: `postgresql://USER:PASSWORD@localhost:5432/DBNAME?schema=public`
 - Many hosted providers require TLS: append **`?sslmode=require`** (or use their Prisma-specific connection string).
 
-**Builds** run `prisma migrate deploy`, so the build environment must reach the database (Vercel: store `DATABASE_URL` in project env vars so the build step can connect).
+**Production builds** run `prisma migrate deploy`, so the production build environment must reach the database (Vercel: store `DATABASE_URL` in project env vars so the build step can connect).
 
 Plan **backups** and restore tests.
 
@@ -63,13 +67,15 @@ Plan **backups** and restore tests.
 
 1. Connect the Git repository and set the **root** to the app root (where `package.json` lives).
 2. Add **all** variables from `.env.example` in the Vercel project **Settings → Environment Variables** (Production and Preview as needed).
-3. Set **`CRON_SECRET`** in production. Vercel Cron (see `vercel.json`) calls `/api/cron/booking-auto-cancel` **once per day at 00:00 UTC**; the route expects `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is set.
+3. Vercel Cron (see `vercel.json`) calls `/api/cron/booking-auto-cancel` **once per day at 00:00 UTC**. If **`CRON_SECRET`** is set, the route requires `Authorization: Bearer <CRON_SECRET>` (Vercel sends it automatically). Without it the job still runs; that is safe because it only cancels bookings already past their payment deadline.
 4. Confirm **`NEXT_PUBLIC_BASE_URL`** and **`BASE_URL`** are your real public `https://` domain.
 5. Add a **PostgreSQL** `DATABASE_URL` (see §2.4). Preview deployments may use a separate database or the same, depending on your workflow.
 
 ### 2.6 File uploads
 
-Attachments (e.g. process documents, payment slips) are stored under **`public/uploads/`** on disk. On a single VM, keep that directory on persistent storage and **include it in backups**. On serverless hosts, plan **blob storage** (S3, etc.) if you outgrow local disk.
+Payment slips and process attachments are stored **in the PostgreSQL database** (table `StoredFile`) and served through `/api/files/[id]`, which checks who is allowed to see each file. Nothing is written to the web server's disk, so this works on Vercel and other serverless hosts. Database backups therefore include the files. Limit: 4 MB per file (Vercel rejects larger uploads). Slips: JPG/PNG/PDF; process files: Excel/Word.
+
+Older files under `public/uploads/` (from before this change) are not migrated automatically and are no longer tracked in git.
 
 ### 2.7 Email (SMTP)
 
@@ -86,11 +92,11 @@ Booking and other notifications need a working SMTP configuration:
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | **PostgreSQL** connection string for Prisma (often `?schema=public`; hosted DBs may need `?sslmode=require`). |
-| `JWT_SECRET` | Signs auth cookies; use a long random string in production. |
+| `JWT_SECRET` | Signs auth cookies; use a long random string in production. If unset, a key derived from `DATABASE_URL` is used. |
 | `SMTP_*`, `FROM_EMAIL`, `FROM_NAME` | Outbound email. |
 | `NEXT_PUBLIC_BASE_URL` | Public site URL (browser-visible, e.g. links). |
 | `BASE_URL` | Server-side base URL for emails and internal URLs. |
-| `CRON_SECRET` | Protects the booking auto-cancel cron (`Bearer` token). **Required in production** for that job to run. |
+| `CRON_SECRET` | Optional. When set, only callers with this `Bearer` token can run the booking auto-cancel job. |
 | `BOOKING_TIMEZONE` | IANA zone for hall booking times (e.g. `Asia/Colombo`); used for payment-deadline logic. |
 
 Copy `.env.example` and fill in real values; never commit `.env`.
@@ -173,7 +179,7 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 ### 7.1 Migrations
 
 - New database changes ship as SQL under `prisma/migrations/`.
-- **Production**: `npm run build` already runs `prisma migrate deploy`. For manual runs: `npx prisma migrate deploy`.
+- **Production**: `npm run build` already runs `prisma migrate deploy` (preview builds on Vercel skip it). For manual runs: `npx prisma migrate deploy`.
 - Always **back up** the database before major upgrades.
 
 ### 7.2 Secrets and rotation
@@ -217,7 +223,7 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 | Emails not sending | SMTP vars, provider blocking “less secure” apps, `FROM_EMAIL` alignment with provider. |
 | Cron always401/500 | `CRON_SECRET` set in production but scheduler missing `Authorization: Bearer ...`. |
 | Processes missing for public | Status must be **published** and tag **Public** for anonymous users. |
-| Build fails on migrate | `DATABASE_URL` unreachable from build environment; run migrations in CI with DB access. |
+| Build fails on migrate (`P1001`) | `DATABASE_URL` unreachable from the production build: check the database is running and not suspended or over quota (Neon console), and that the URL is current. |
 
 ### 8.1 First admin on production (e.g. Vercel)
 

@@ -20,6 +20,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     if (!existing) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
+    if (existing.status === 'BOOKED_PAID') {
+      return NextResponse.json({ error: 'This booking has been paid. Paid bookings cannot be cancelled.' }, { status: 400 });
+    }
 
     // Check if there's already a pending delete approval for this booking
     const existingApproval = await prisma.approval.findFirst({
@@ -46,3 +49,5 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 }
 
+
+export const dynamic = 'force-dynamic';

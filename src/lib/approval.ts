@@ -1,634 +1,490 @@
-import { prisma } from './prisma';
+/**
+ * Maker–checker approval engine.
+ *
+ * Rule (agreed with the church): one admin submits a change (the maker) and a DIFFERENT,
+ * active admin approves it (the checker). Nothing goes live until the checker approves.
+ * Staff can view the queue but can never approve or reject.
+ *
+ * Public hall-booking requests are submitted by the internal "system" user, so any admin
+ * may act on them.
+ *
+ * Every approve/reject is written to the audit log with maker and checker.
+ */
+import type { Approval, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import { prisma } from './prisma';
 import { audit } from './audit';
+import { deleteProcessAttachmentsByIds, unlinkProcessAttachmentFiles } from './processAttachmentFs';
+import { deleteStoredFiles } from './storedFiles';
+import { findBookingClash } from './bookingClash';
 
-// Get or create a system user for guest submissions (like bookings)
+type Tx = Prisma.TransactionClient;
+
+export class ApprovalError extends Error {
+  status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const SYSTEM_EMAIL = 'system@church.local';
+
+/** Internal user that "submits" public booking requests. It can never log in. */
 export async function getOrCreateSystemUser() {
-  const systemEmail = 'system@church.local';
-  let systemUser = await prisma.user.findUnique({ where: { email: systemEmail } });
+  let systemUser = await prisma.user.findUnique({ where: { email: SYSTEM_EMAIL } });
   if (!systemUser) {
-    const hash = await bcrypt.hash('system', 10);
+    // Random, unknowable password: this account must never be usable for login.
+    const hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
     systemUser = await prisma.user.create({
-      data: {
-        name: 'System User',
-        email: systemEmail,
-        passwordHash: hash,
-        role: 'guest',
-        status: 'active'
-      }
+      data: { name: 'Website (public request)', email: SYSTEM_EMAIL, passwordHash: hash, role: 'guest', status: 'disabled' },
     });
   }
   return systemUser;
 }
 
-export async function submitApproval(resourceType: string, resourceId: number, action: string, submitterId: number) {
+export async function submitApproval(
+  resourceType: string,
+  resourceId: number,
+  action: string,
+  submitterId: number,
+  payload?: unknown
+) {
   return prisma.approval.create({
-    data: { resourceType, resourceId, action, submitterId, status: 'SUBMITTED' }
+    data: {
+      resourceType,
+      resourceId,
+      action,
+      submitterId,
+      status: 'SUBMITTED',
+      payloadJson: payload === undefined ? null : JSON.stringify(payload),
+    },
   });
 }
 
-export async function approve(resourceType: string, resourceId: number, approverId: number, comment: string) {
-  const approval = await prisma.approval.findFirst({ where: { resourceType, resourceId, status: 'SUBMITTED' } });
-  if (!approval) throw new Error('No pending approval');
-  if (!approval.approver1Id) {
-    if (approval.submitterId === approverId) throw new Error('Submitter cannot approve');
-    
-    // For notices, sermons, and assets, single approval is sufficient - approve immediately
-    if (approval.action === 'publish') {
-      if (approval.resourceType === 'notice') {
-        const updated = await prisma.approval.update({ 
-          where: { id: approval.id }, 
-          data: { 
-            approver1Id: approverId, 
-            comment1: comment,
-            status: 'APPROVED' 
-          } 
-        });
-        await prisma.notice.update({
-          where: { id: approval.resourceId },
-          data: { status: 'published' }
-        });
-        
-        // Audit log with requestor and approver
-        await audit(approverId, 'approve_notice', 'notice', approval.resourceId, 
-          { status: 'draft' }, 
-          { status: 'published' },
-          approval.submitterId,
-          approverId
-        );
-        
-        return updated;
-      }
-      
-      if (approval.resourceType === 'sermon') {
-        const updated = await prisma.approval.update({ 
-          where: { id: approval.id }, 
-          data: { 
-            approver1Id: approverId, 
-            comment1: comment,
-            status: 'APPROVED' 
-          } 
-        });
-        
-        await prisma.sermon.update({
-          where: { id: approval.resourceId },
-          data: { status: 'published' }
-        });
-
-        // Audit log with requestor and approver
-        await audit(approverId, 'approve_sermon', 'sermon', approval.resourceId,
-          { status: 'draft' },
-          { status: 'published' },
-          approval.submitterId,
-          approverId
-        );
-        
-        return updated;
-      }
-    }
-    
-    // For assets (action: 'create'), single approval is sufficient
-    if (approval.resourceType === 'asset' && approval.action === 'create') {
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      // Assets are already created with status 'active', so no status change needed
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_asset_create', 'asset', approval.resourceId,
-        null,
-        { action: 'create', status: 'approved' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-    
-    // For asset updates, parse the update data from comment1 and update the original asset
-    if (approval.resourceType === 'asset' && approval.action === 'update') {
-      let updateData: any = {};
-      try {
-        // Parse the update data stored in comment1
-        if (approval.comment1) {
-          updateData = JSON.parse(approval.comment1);
-        }
-      } catch (e) {
-        throw new Error('Invalid update data in approval');
-      }
-      
-      const asset = await prisma.asset.findUnique({ where: { id: approval.resourceId } });
-      if (!asset) {
-        throw new Error('Asset not found');
-      }
-      
-      // Update the original asset with the new data
-      await prisma.asset.update({
-        where: { id: approval.resourceId },
-        data: {
-          reference: updateData.reference,
-          value: updateData.value,
-          quantity: updateData.quantity,
-          labelCategory: updateData.labelCategory,
-          notes: updateData.notes
-        }
-      });
-      
-      // Update approval with approver comment (replacing the JSON data)
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment || 'Approved', // Replace JSON with approver's comment
-          status: 'APPROVED' 
-        } 
-      });
-      
-      return updated;
-    }
-    
-    // For asset deletions, single approval is sufficient - delete the asset when approved
-    if (approval.resourceType === 'asset' && approval.action === 'delete') {
-      const asset = await prisma.asset.findUnique({ where: { id: approval.resourceId } });
-      if (!asset) {
-        throw new Error('Asset not found');
-      }
-      
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      
-      // Delete the asset after approval
-      await prisma.asset.delete({ where: { id: approval.resourceId } });
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_asset_delete', 'asset', approval.resourceId,
-        asset,
-        { action: 'delete', status: 'deleted' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-    
-    // For notice deletions, single approval is sufficient - delete the notice when approved
-    if (approval.resourceType === 'notice' && approval.action === 'delete') {
-      const notice = await prisma.notice.findUnique({ where: { id: approval.resourceId } });
-      if (!notice) {
-        throw new Error('Notice not found');
-      }
-      
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      
-      // Delete the notice after approval
-      await prisma.notice.delete({ where: { id: approval.resourceId } });
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_notice_delete', 'notice', approval.resourceId,
-        notice,
-        { action: 'delete', status: 'deleted' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-    
-    // For sermon deletions, single approval is sufficient - delete the sermon when approved
-    if (approval.resourceType === 'sermon' && approval.action === 'delete') {
-      const sermon = await prisma.sermon.findUnique({ where: { id: approval.resourceId } });
-      if (!sermon) {
-        throw new Error('Sermon not found');
-      }
-      
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      
-      // Delete the sermon after approval
-      await prisma.sermon.delete({ where: { id: approval.resourceId } });
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_sermon_delete', 'sermon', approval.resourceId,
-        sermon,
-        { action: 'delete', status: 'deleted' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-    
-    // For process documents (action: 'publish'), single approval is sufficient - publish immediately
-    if (approval.resourceType === 'process' && approval.action === 'publish') {
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      await prisma.processDoc.update({ where: { id: approval.resourceId }, data: { status: 'published' } });
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_process_create', 'process', approval.resourceId,
-        { status: 'submitted' },
-        { status: 'published' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-    
-    // For process updates, parse the update data from comment1 and update the original process
-    if (approval.resourceType === 'process' && approval.action === 'update') {
-      let updateData: any = {};
-      try {
-        // Parse the update data stored in comment1
-        if (approval.comment1) {
-          updateData = JSON.parse(approval.comment1);
-        }
-      } catch (e) {
-        throw new Error('Invalid update data in approval');
-      }
-      
-      const process = await prisma.processDoc.findUnique({ where: { id: approval.resourceId } });
-      if (!process) {
-        throw new Error('Process not found');
-      }
-      
-      // Update the original process with the new data
-      const nextAudience =
-        updateData.audience === 'public' || updateData.audience === 'steward'
-          ? updateData.audience
-          : process.audience;
-
-      await prisma.processDoc.update({
-        where: { id: approval.resourceId },
-        data: {
-          title: updateData.title,
-          contentHtml: updateData.contentHtml,
-          audience: nextAudience,
-          version: process.version + 1,
-        },
-      });
-
-      const removeIds = Array.isArray(updateData.removeAttachmentIds)
-        ? updateData.removeAttachmentIds.map((x: unknown) => Number(x)).filter((n: number) => Number.isFinite(n) && n > 0)
-        : [];
-      if (removeIds.length) {
-        const { deleteProcessAttachmentsByIds } = await import('@/lib/processAttachmentFs');
-        await deleteProcessAttachmentsByIds(approval.resourceId, removeIds);
-      }
-
-      // Update approval with approver comment (replacing the JSON data)
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment || 'Approved', // Replace JSON with approver's comment
-          status: 'APPROVED' 
-        } 
-      });
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_asset_update', 'asset', approval.resourceId,
-        updateData,
-        { action: 'update', status: 'approved' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-    
-    // For process deletions, single approval is sufficient - delete the process when approved
-    if (approval.resourceType === 'process' && approval.action === 'delete') {
-      const process = await prisma.processDoc.findUnique({ where: { id: approval.resourceId } });
-      if (!process) {
-        throw new Error('Process not found');
-      }
-      
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      
-      const { unlinkProcessAttachmentFiles } = await import('@/lib/processAttachmentFs');
-      await unlinkProcessAttachmentFiles(approval.resourceId);
-      // Delete the process after approval (attachments cascade in DB)
-      await prisma.processDoc.delete({ where: { id: approval.resourceId } });
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_process_delete', 'process', approval.resourceId,
-        process,
-        { action: 'delete', status: 'deleted' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-    
-    // For booking payment confirmations (action: 'confirm_payment'), single approval is sufficient
-    if (approval.resourceType === 'booking' && approval.action === 'confirm_payment') {
-      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
-      
-      if (!booking.slipUrl) {
-        throw new Error('No payment receipt uploaded');
-      }
-      
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      
-      // Update booking status to BOOKED_PAID
-      await prisma.booking.update({ 
-        where: { id: approval.resourceId }, 
-        data: { status: 'BOOKED_PAID' } 
-      });
-      
-      // Send payment confirmation email to requester
-      try {
-        const { sendBookingPaymentConfirmedEmail } = await import('@/lib/email');
-        await sendBookingPaymentConfirmedEmail({
-          bookingRef: booking.bookingRef,
-          requesterName: booking.requesterName,
-          email: booking.email,
-          phone: booking.phone,
-          hall: booking.hall,
-          date: booking.date.toISOString(),
-          startTime: booking.startTime,
-          endTime: booking.endTime,
-          purpose: booking.purpose,
-          amount: booking.amount || undefined,
-          paymentRef: booking.paymentRef || undefined,
-        });
-      } catch (emailError: any) {
-        console.error('Error sending payment confirmation email:', emailError);
-        // Don't fail the approval if email fails
-      }
-      
-      return updated;
-    }
-    
-    // For bookings (action: 'approve'), single approval is sufficient
-    if (approval.resourceType === 'booking' && approval.action === 'approve') {
-      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
-      
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      await prisma.booking.update({ where: { id: approval.resourceId }, data: { status: 'APPROVED_PENDING_PAYMENT' } });
-      
-      // Send approval email to requester
-      try {
-        const { sendBookingApprovalEmail } = await import('@/lib/email');
-        // Get base URL, ensuring it's a clean URL without the variable name
-        let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || 'http://localhost:3001';
-        // Remove any trailing slashes and ensure it's a proper URL
-        baseUrl = baseUrl.trim().replace(/\/$/, '');
-        // If it somehow contains the variable name, extract just the URL part
-        if (baseUrl.includes('BASE_URL=')) {
-          baseUrl = baseUrl.split('BASE_URL=')[1] || 'http://localhost:3001';
-        }
-        await sendBookingApprovalEmail(
-          {
-            bookingRef: booking.bookingRef,
-            requesterName: booking.requesterName,
-            email: booking.email,
-            phone: booking.phone,
-            hall: booking.hall,
-            date: booking.date.toISOString(),
-            startTime: booking.startTime,
-            endTime: booking.endTime,
-            purpose: booking.purpose,
-            amount: booking.amount || undefined
-          },
-          baseUrl
-        );
-      } catch (emailError: any) {
-        console.error('Error sending booking approval email:', emailError);
-        // Don't fail the approval if email fails
-      }
-      
-      return updated;
-    }
-    
-    // For booking deletions, single approval is sufficient - delete the booking when approved
-    if (approval.resourceType === 'booking' && approval.action === 'delete') {
-      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
-      
-      const updated = await prisma.approval.update({ 
-        where: { id: approval.id }, 
-        data: { 
-          approver1Id: approverId, 
-          comment1: comment,
-          status: 'APPROVED' 
-        } 
-      });
-      
-      // Delete the booking after approval
-      await prisma.booking.delete({ where: { id: approval.resourceId } });
-      
-      // Audit log with requestor and approver
-      await audit(approverId, 'approve_booking_delete', 'booking', approval.resourceId,
-        booking,
-        { action: 'delete', status: 'deleted' },
-        approval.submitterId,
-        approverId
-      );
-      
-      return updated;
-    }
-
-    // Church bank account updates: single approval — publish live row and mark proposal approved
-    if (approval.resourceType === 'church_bank_account' && approval.action === 'update') {
-      const proposal = await prisma.churchBankAccountProposal.findUnique({
-        where: { id: approval.resourceId }
-      });
-      if (!proposal) throw new Error('Bank account proposal not found');
-      if (proposal.status !== 'PENDING') throw new Error('This proposal is no longer pending');
-      await prisma.churchBankAccount.upsert({
-        where: { id: 1 },
-        create: {
-          id: 1,
-          accountNumber: proposal.accountNumber,
-          accountName: proposal.accountName,
-          bankName: proposal.bankName,
-          branch: proposal.branch
-        },
-        update: {
-          accountNumber: proposal.accountNumber,
-          accountName: proposal.accountName,
-          bankName: proposal.bankName,
-          branch: proposal.branch
-        }
-      });
-      await prisma.churchBankAccountProposal.update({
-        where: { id: proposal.id },
-        data: { status: 'APPROVED' }
-      });
-      return prisma.approval.update({
-        where: { id: approval.id },
-        data: {
-          approver1Id: approverId,
-          comment1: comment,
-          status: 'APPROVED'
-        }
-      });
-    }
-
-    // For any other resource types, still require dual approval (fallback)
-    return prisma.approval.update({ where: { id: approval.id }, data: { approver1Id: approverId, comment1: comment } });
-  }
-  if (!approval.approver2Id) {
-    if (approval.submitterId === approverId || approval.approver1Id === approverId) throw new Error('Approver must be distinct');
-    const updated = await prisma.approval.update({ where: { id: approval.id }, data: { approver2Id: approverId, comment2: comment, status: 'APPROVED' } });
-
-    if (approval.resourceType === 'church_bank_account') {
-      const proposal = await prisma.churchBankAccountProposal.findUnique({
-        where: { id: approval.resourceId }
-      });
-      if (!proposal) throw new Error('Bank account proposal not found');
-      if (proposal.status !== 'PENDING') throw new Error('This proposal is no longer pending');
-      await prisma.churchBankAccount.upsert({
-        where: { id: 1 },
-        create: {
-          id: 1,
-          accountNumber: proposal.accountNumber,
-          accountName: proposal.accountName,
-          bankName: proposal.bankName,
-          branch: proposal.branch
-        },
-        update: {
-          accountNumber: proposal.accountNumber,
-          accountName: proposal.accountName,
-          bankName: proposal.bankName,
-          branch: proposal.branch
-        }
-      });
-      await prisma.churchBankAccountProposal.update({
-        where: { id: proposal.id },
-        data: { status: 'APPROVED' }
-      });
-    }
-
-    return updated;
-  }
-  return approval;
+/** True when an approval of this resource is already waiting. */
+export async function hasPendingApproval(resourceType: string, resourceId: number, actions?: string[]) {
+  const row = await prisma.approval.findFirst({
+    where: { resourceType, resourceId, status: 'SUBMITTED', ...(actions ? { action: { in: actions } } : {}) },
+    select: { id: true },
+  });
+  return !!row;
 }
 
-export async function reject(resourceType: string, resourceId: number, approverId: number, comment: string) {
-  const approval = await prisma.approval.findFirst({ where: { resourceType, resourceId, status: 'SUBMITTED' } });
-  if (!approval) throw new Error('No pending approval');
-  
-  // For bookings, comment is mandatory
-  if (approval.resourceType === 'booking' && (!comment || comment.trim() === '')) {
-    throw new Error('Rejection reason is required for booking rejections');
+/** Proposed data for an approval. Older rows stored it in comment1. */
+export function readPayload(a: Pick<Approval, 'payloadJson' | 'comment1' | 'status'>): any {
+  const raw = a.payloadJson ?? (a.status === 'SUBMITTED' ? a.comment1 : null);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
-  
-  const updated = await prisma.approval.update({ 
-    where: { id: approval.id }, 
-    data: { 
-      status: 'REJECTED', 
-      approver1Id: approverId,
-      comment1: comment 
-    } 
+}
+
+type Locator = { approvalId?: number; resourceType?: string; resourceId?: number };
+
+async function findPending(loc: Locator): Promise<Approval> {
+  const a = loc.approvalId
+    ? await prisma.approval.findUnique({ where: { id: loc.approvalId } })
+    : await prisma.approval.findFirst({
+        where: { resourceType: loc.resourceType, resourceId: loc.resourceId, status: 'SUBMITTED' },
+        orderBy: { createdAt: 'asc' },
+      });
+  if (!a) throw new ApprovalError('This request could not be found.', 404);
+  if (a.status !== 'SUBMITTED') throw new ApprovalError('This request has already been dealt with.', 409);
+  return a;
+}
+
+async function assertChecker(a: Approval, userId: number) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || user.role !== 'admin' || user.status !== 'active') {
+    throw new ApprovalError('Only an administrator can approve or reject changes.', 403);
+  }
+  if (a.submitterId === userId) {
+    throw new ApprovalError('You made this change, so a different administrator must approve or reject it.', 403);
+  }
+}
+
+/** Atomically move SUBMITTED -> status so two admins clicking at once cannot both act. */
+async function claim(tx: Tx, a: Approval, status: 'APPROVED' | 'REJECTED', userId: number, comment: string) {
+  const res = await tx.approval.updateMany({
+    where: { id: a.id, status: 'SUBMITTED' },
+    data: { status, approver1Id: userId, comment1: comment || (status === 'APPROVED' ? 'Approved' : '') },
+  });
+  if (res.count === 0) throw new ApprovalError('This request has already been dealt with.', 409);
+}
+
+type Outcome = { before?: unknown; after?: unknown; resourceId?: number; afterCommit?: () => Promise<void> };
+
+function bookingEmailDetails(b: any) {
+  return {
+    bookingRef: b.bookingRef,
+    requesterName: b.requesterName,
+    email: b.email,
+    phone: b.phone,
+    hall: b.hall,
+    date: b.date.toISOString(),
+    startTime: b.startTime,
+    endTime: b.endTime,
+    purpose: b.purpose,
+    amount: b.amount ?? undefined,
+    paymentRef: b.paymentRef ?? undefined,
+  };
+}
+
+function baseUrl() {
+  // Falls back to the address Vercel gives the live site, so email links work without extra setup.
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  return (
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.BASE_URL ||
+    (vercelHost ? `https://${vercelHost}` : 'http://localhost:3000')
+  )
+    .trim()
+    .replace(/\/$/, '');
+}
+
+function toDate(v: unknown): Date | null {
+  if (v === null || v === undefined || v === '') return null;
+  const d = new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Field updates for a ChurchIndividual from a validated payload. */
+function individualData(p: any): Prisma.ChurchIndividualUncheckedUpdateInput {
+  const data: Prisma.ChurchIndividualUncheckedUpdateInput = {};
+  if (p.displayName !== undefined) data.displayName = String(p.displayName);
+  if (p.birthDate !== undefined) data.birthDate = toDate(p.birthDate);
+  if (p.email !== undefined) data.email = p.email || null;
+  if (p.phone !== undefined) data.phone = p.phone || null;
+  if (p.notes !== undefined) data.notes = p.notes || null;
+  if (p.status !== undefined) data.status = p.status;
+  if (p.dateOfDeath !== undefined) {
+    data.dateOfDeath = toDate(p.dateOfDeath);
+    if (data.dateOfDeath) data.status = 'inactive';
+  }
+  return data;
+}
+
+function anniversaryData(p: any): Prisma.WeddingAnniversaryUncheckedUpdateInput {
+  const data: Prisma.WeddingAnniversaryUncheckedUpdateInput = {};
+  if (p.individualAId !== undefined) data.individualAId = Number(p.individualAId);
+  if (p.individualBId !== undefined) data.individualBId = Number(p.individualBId);
+  if (p.anniversaryDate !== undefined) data.anniversaryDate = toDate(p.anniversaryDate) as Date;
+  if (p.notes !== undefined) data.notes = p.notes || null;
+  if (p.status !== undefined) data.status = p.status;
+  return data;
+}
+
+async function applyApproved(tx: Tx, a: Approval, payload: any): Promise<Outcome> {
+  const id = a.resourceId;
+  const key = `${a.resourceType}:${a.action}`;
+  switch (key) {
+    case 'asset:create': {
+      const after = await tx.asset.update({ where: { id }, data: { status: 'active' } });
+      return { after };
+    }
+    case 'asset:update': {
+      if (!payload) throw new ApprovalError('The proposed changes are missing.');
+      const before = await tx.asset.findUnique({ where: { id } });
+      if (!before) throw new ApprovalError('This asset no longer exists.');
+      const after = await tx.asset.update({
+        where: { id },
+        data: {
+          reference: payload.reference,
+          value: payload.value,
+          quantity: payload.quantity,
+          labelCategory: payload.labelCategory,
+          notes: payload.notes,
+        },
+      });
+      return { before, after };
+    }
+    case 'asset:delete': {
+      const before = await tx.asset.findUnique({ where: { id } });
+      if (!before) throw new ApprovalError('This asset no longer exists.');
+      await tx.asset.delete({ where: { id } });
+      return { before, after: { deleted: true } };
+    }
+
+    case 'notice:publish':
+    case 'sermon:publish': {
+      const model: any = a.resourceType === 'notice' ? tx.notice : tx.sermon;
+      const after = await model.update({ where: { id }, data: { status: 'published' } });
+      return { after };
+    }
+    case 'notice:delete':
+    case 'sermon:delete': {
+      const model: any = a.resourceType === 'notice' ? tx.notice : tx.sermon;
+      const before = await model.findUnique({ where: { id } });
+      if (!before) throw new ApprovalError('This item no longer exists.');
+      await model.delete({ where: { id } });
+      return { before, after: { deleted: true } };
+    }
+
+    case 'process:publish': {
+      const after = await tx.processDoc.update({ where: { id }, data: { status: 'published' } });
+      await tx.processAttachment.updateMany({ where: { processDocId: id, status: 'pending' }, data: { status: 'active' } });
+      return { after };
+    }
+    case 'process:update': {
+      const before = await tx.processDoc.findUnique({ where: { id } });
+      if (!before) throw new ApprovalError('This process document no longer exists.');
+      const p = payload || {};
+      const audience = p.audience === 'public' || p.audience === 'steward' ? p.audience : before.audience;
+      const after = await tx.processDoc.update({
+        where: { id },
+        data: {
+          title: p.title ?? before.title,
+          contentHtml: p.contentHtml ?? before.contentHtml,
+          audience,
+          version: before.version + 1,
+        },
+      });
+      await tx.processAttachment.updateMany({ where: { processDocId: id, status: 'pending' }, data: { status: 'active' } });
+      if (Array.isArray(p.removeAttachmentIds) && p.removeAttachmentIds.length) {
+        await deleteProcessAttachmentsByIds(id, p.removeAttachmentIds.map(Number), tx);
+      }
+      return { before, after };
+    }
+    case 'process:delete': {
+      const before = await tx.processDoc.findUnique({ where: { id } });
+      if (!before) throw new ApprovalError('This process document no longer exists.');
+      await unlinkProcessAttachmentFiles(id, tx);
+      await tx.processDoc.delete({ where: { id } });
+      return { before, after: { deleted: true } };
+    }
+
+    case 'booking:approve': {
+      const b = await tx.booking.findUnique({ where: { id } });
+      if (!b) throw new ApprovalError('This booking no longer exists.');
+      if (b.status !== 'REQUESTED') throw new ApprovalError(`This booking is ${b.status} and cannot be approved.`);
+      const clash = await findBookingClash(tx, { hall: b.hall, date: b.date, startTime: b.startTime, endTime: b.endTime, excludeId: b.id });
+      if (clash) {
+        throw new ApprovalError(
+          `This time clashes with booking ${clash.bookingRef} (${clash.startTime}–${clash.endTime}), which is already approved. Please reject this request.`
+        );
+      }
+      const after = await tx.booking.update({ where: { id }, data: { status: 'APPROVED_PENDING_PAYMENT' } });
+      return {
+        before: { status: b.status },
+        after: { status: after.status },
+        afterCommit: async () => {
+          const { sendBookingApprovalEmail } = await import('./email');
+          await sendBookingApprovalEmail(bookingEmailDetails(after), baseUrl());
+        },
+      };
+    }
+    case 'booking:confirm_payment': {
+      const b = await tx.booking.findUnique({ where: { id } });
+      if (!b) throw new ApprovalError('This booking no longer exists.');
+      if (b.status !== 'APPROVED_PENDING_PAYMENT') throw new ApprovalError(`This booking is ${b.status}; payment cannot be confirmed.`);
+      if (!b.slipFileId && !b.slipUrl) throw new ApprovalError('No payment slip has been uploaded yet.');
+      const after = await tx.booking.update({ where: { id }, data: { status: 'BOOKED_PAID' } });
+      return {
+        before: { status: b.status },
+        after: { status: after.status, paymentRef: after.paymentRef, amount: after.amount },
+        afterCommit: async () => {
+          const { sendBookingPaymentConfirmedEmail } = await import('./email');
+          await sendBookingPaymentConfirmedEmail(bookingEmailDetails(after));
+        },
+      };
+    }
+    case 'booking:delete': {
+      const b = await tx.booking.findUnique({ where: { id } });
+      if (!b) throw new ApprovalError('This booking no longer exists.');
+      if (b.status === 'BOOKED_PAID') throw new ApprovalError('Paid bookings cannot be cancelled.');
+      await tx.booking.delete({ where: { id } });
+      await deleteStoredFiles([b.slipFileId], tx);
+      return { before: b, after: { deleted: true } };
+    }
+
+    case 'church_bank_account:update': {
+      const proposal = await tx.churchBankAccountProposal.findUnique({ where: { id } });
+      if (!proposal) throw new ApprovalError('Bank account proposal not found.');
+      if (proposal.status !== 'PENDING') throw new ApprovalError('This proposal is no longer pending.');
+      const fields = {
+        accountNumber: proposal.accountNumber,
+        accountName: proposal.accountName,
+        bankName: proposal.bankName,
+        branch: proposal.branch,
+      };
+      const before = await tx.churchBankAccount.findUnique({ where: { id: 1 } });
+      await tx.churchBankAccount.upsert({ where: { id: 1 }, create: { id: 1, ...fields }, update: fields });
+      await tx.churchBankAccountProposal.update({ where: { id: proposal.id }, data: { status: 'APPROVED' } });
+      return { before, after: fields };
+    }
+
+    case 'hall_settings:update': {
+      const rate = Number(payload?.ratePer30Minutes);
+      if (!Number.isFinite(rate) || rate < 0) throw new ApprovalError('The proposed rate is not valid.');
+      const before = await tx.hallBookingSettings.findUnique({ where: { id: 1 } });
+      await tx.hallBookingSettings.upsert({
+        where: { id: 1 },
+        create: { id: 1, ratePer30Minutes: rate },
+        update: { ratePer30Minutes: rate },
+      });
+      return { before, after: { ratePer30Minutes: rate } };
+    }
+
+    case 'individual:create': {
+      const created = await tx.churchIndividual.create({
+        data: { ...(individualData(payload) as any), displayName: String(payload.displayName), status: payload.status || 'active' },
+      });
+      await tx.approval.update({ where: { id: a.id }, data: { resourceId: created.id } });
+      return { after: created, resourceId: created.id };
+    }
+    case 'individual:update': {
+      const before = await tx.churchIndividual.findUnique({ where: { id } });
+      if (!before) throw new ApprovalError('This person no longer exists in the register.');
+      const after = await tx.churchIndividual.update({ where: { id }, data: individualData(payload) });
+      return { before, after };
+    }
+    case 'anniversary:create': {
+      const created = await tx.weddingAnniversary.create({
+        data: { ...(anniversaryData(payload) as any), status: 'active' },
+      });
+      await tx.approval.update({ where: { id: a.id }, data: { resourceId: created.id } });
+      return { after: created, resourceId: created.id };
+    }
+    case 'anniversary:update': {
+      const before = await tx.weddingAnniversary.findUnique({ where: { id } });
+      if (!before) throw new ApprovalError('This anniversary no longer exists.');
+      const after = await tx.weddingAnniversary.update({ where: { id }, data: anniversaryData(payload) });
+      return { before, after };
+    }
+  }
+  throw new ApprovalError(`Unknown request type: ${a.resourceType} / ${a.action}`);
+}
+
+async function applyRejected(tx: Tx, a: Approval, comment: string): Promise<Outcome> {
+  const id = a.resourceId;
+  switch (`${a.resourceType}:${a.action}`) {
+    case 'asset:create':
+      await tx.asset.updateMany({ where: { id }, data: { status: 'rejected' } });
+      return {};
+    case 'notice:publish':
+      await tx.notice.updateMany({ where: { id }, data: { status: 'rejected' } });
+      return {};
+    case 'sermon:publish':
+      await tx.sermon.updateMany({ where: { id }, data: { status: 'rejected' } });
+      return {};
+    case 'process:publish':
+      await tx.processDoc.updateMany({ where: { id }, data: { status: 'rejected' } });
+      return {};
+    case 'process:update': {
+      // Files added as part of this change are discarded.
+      const pending = await tx.processAttachment.findMany({ where: { processDocId: id, status: 'pending' }, select: { id: true } });
+      await deleteProcessAttachmentsByIds(id, pending.map((p) => p.id), tx);
+      return {};
+    }
+    case 'church_bank_account:update':
+      await tx.churchBankAccountProposal.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'REJECTED' } });
+      return {};
+    case 'booking:approve': {
+      const b = await tx.booking.update({ where: { id }, data: { status: 'REJECTED' } });
+      return {
+        afterCommit: async () => {
+          const { sendBookingRejectionEmail } = await import('./email');
+          await sendBookingRejectionEmail(bookingEmailDetails(b), comment);
+        },
+      };
+    }
+    case 'booking:confirm_payment': {
+      // Slip not accepted: clear it so the person can upload a correct one before the deadline.
+      const b = await tx.booking.findUnique({ where: { id } });
+      if (b && b.status === 'APPROVED_PENDING_PAYMENT') {
+        await tx.booking.update({ where: { id }, data: { slipFileId: null, slipUrl: null, paymentRef: null } });
+        await deleteStoredFiles([b.slipFileId], tx);
+      }
+      return {};
+    }
+  }
+  return {};
+}
+
+async function runAfterCommit(o: Outcome) {
+  if (!o.afterCommit) return;
+  try {
+    await o.afterCommit();
+  } catch (e) {
+    // Email failures must not undo an approval; they are logged for follow-up.
+    console.error('Approval follow-up (email) failed:', e);
+  }
+}
+
+export async function approve(
+  resourceTypeOrLocator: string | Locator,
+  resourceIdOrApprover: number,
+  approverIdOrComment?: number | string,
+  maybeComment?: string
+) {
+  // Supports approve({approvalId}, approverId, comment) and the older approve(type, id, approverId, comment).
+  const loc: Locator =
+    typeof resourceTypeOrLocator === 'string'
+      ? { resourceType: resourceTypeOrLocator, resourceId: resourceIdOrApprover }
+      : resourceTypeOrLocator;
+  const approverId = typeof resourceTypeOrLocator === 'string' ? Number(approverIdOrComment) : resourceIdOrApprover;
+  const comment = String((typeof resourceTypeOrLocator === 'string' ? maybeComment : approverIdOrComment) ?? '').trim();
+
+  const a = await findPending(loc);
+  await assertChecker(a, approverId);
+  const payload = readPayload(a);
+
+  const outcome = await prisma.$transaction(async (tx) => {
+    await claim(tx, a, 'APPROVED', approverId, comment);
+    return applyApproved(tx, a, payload);
   });
 
-  if (approval.resourceType === 'church_bank_account') {
-    await prisma.churchBankAccountProposal.updateMany({
-      where: { id: approval.resourceId, status: 'PENDING' },
-      data: { status: 'REJECTED' }
-    });
-  }
-  
-  // Audit log with requestor and approver for rejection
-  await audit(approverId, `reject_${approval.resourceType}`, approval.resourceType, approval.resourceId,
-    { status: 'SUBMITTED' },
-    { status: 'REJECTED', comment },
-    approval.submitterId,
+  await audit(
+    approverId,
+    `approve_${a.resourceType}_${a.action}`,
+    a.resourceType,
+    outcome.resourceId ?? a.resourceId,
+    outcome.before ?? null,
+    outcome.after ?? { status: 'approved' },
+    a.submitterId,
     approverId
   );
-  
-  // Update booking status to REJECTED
-  if (approval.resourceType === 'booking') {
-    await prisma.booking.update({ 
-      where: { id: approval.resourceId }, 
-      data: { status: 'REJECTED' } 
-    });
-    
-    // Send rejection email to requester
-    try {
-      const booking = await prisma.booking.findUnique({ where: { id: approval.resourceId } });
-      if (booking) {
-        const { sendBookingRejectionEmail } = await import('@/lib/email');
-        await sendBookingRejectionEmail({
-          bookingRef: booking.bookingRef,
-          requesterName: booking.requesterName,
-          email: booking.email,
-          phone: booking.phone,
-          hall: booking.hall,
-          date: booking.date.toISOString(),
-          startTime: booking.startTime,
-          endTime: booking.endTime,
-          purpose: booking.purpose,
-        }, comment);
-      }
-    } catch (emailError: any) {
-      console.error('Error sending booking rejection email:', emailError);
-      // Don't fail the rejection if email fails
-    }
-  }
-  
-  return updated;
+  await runAfterCommit(outcome);
+  return prisma.approval.findUnique({ where: { id: a.id } });
+}
+
+export async function reject(
+  resourceTypeOrLocator: string | Locator,
+  resourceIdOrApprover: number,
+  approverIdOrComment?: number | string,
+  maybeComment?: string
+) {
+  const loc: Locator =
+    typeof resourceTypeOrLocator === 'string'
+      ? { resourceType: resourceTypeOrLocator, resourceId: resourceIdOrApprover }
+      : resourceTypeOrLocator;
+  const approverId = typeof resourceTypeOrLocator === 'string' ? Number(approverIdOrComment) : resourceIdOrApprover;
+  const comment = String((typeof resourceTypeOrLocator === 'string' ? maybeComment : approverIdOrComment) ?? '').trim();
+
+  if (!comment) throw new ApprovalError('Please give a reason for rejecting.');
+
+  const a = await findPending(loc);
+  await assertChecker(a, approverId);
+
+  const outcome = await prisma.$transaction(async (tx) => {
+    await claim(tx, a, 'REJECTED', approverId, comment);
+    return applyRejected(tx, a, comment);
+  });
+
+  await audit(
+    approverId,
+    `reject_${a.resourceType}_${a.action}`,
+    a.resourceType,
+    a.resourceId,
+    { status: 'SUBMITTED' },
+    { status: 'REJECTED', reason: comment },
+    a.submitterId,
+    approverId
+  );
+  await runAfterCommit(outcome);
+  return prisma.approval.findUnique({ where: { id: a.id } });
 }

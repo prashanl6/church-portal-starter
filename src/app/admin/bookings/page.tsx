@@ -2,6 +2,17 @@
 import useSWR from 'swr';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { PageHeader, ADMIN_BACK, EmptyState, SkeletonList, StatusBadge, DateChip, longDate } from '@/components/ui';
+import { IconCalendar } from '@/components/Icons';
+
+const FILTER_LABELS: Record<string, string> = {
+  all: 'All',
+  REQUESTED: 'Pending',
+  APPROVED_PENDING_PAYMENT: 'Approved',
+  BOOKED_PAID: 'Paid',
+  REJECTED: 'Rejected',
+  AUTO_CANCELLED: 'Auto-cancelled',
+};
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -83,25 +94,132 @@ function AdminBookingsPageContent() {
   ) : [];
 
   return (
-    <div className="grid gap-4">
-      <div className="card grid gap-3">
-        <h2 className="text-lg font-semibold">Hall hire pricing</h2>
-        <p className="text-sm text-gray-600">
-          Set the amount charged per <strong>30-minute block</strong>. Public bookings multiply the number of blocks
-          (from start and end time, rounding up) by this rate to show an estimated total before the customer confirms.
-        </p>
-        {hallSettingsLoading && <p className="text-sm text-gray-500">Loading current rate…</p>}
-        {hallSettingsError && (
-          <p className="text-sm text-red-700">
-            Could not load hall pricing: {hallSettingsError.message}. If you recently ran a database migration, restart
-            the dev server and run <code className="text-xs bg-red-50 px-1 rounded">npx prisma generate</code>.
-          </p>
+    <div className="page">
+      <PageHeader
+        back={ADMIN_BACK}
+        title="Hall bookings"
+        subtitle="Review requests, check payment slips and set the hall hire rate."
+      />
+
+      <div className="stack">
+        <div className="segmented" role="tablist" aria-label="Filter bookings">
+          {FILTER_OPTIONS.map((f) => (
+            <button
+              key={f}
+              role="tab"
+              aria-selected={filter === f}
+              className={filter === f ? 'is-active' : ''}
+              onClick={() => handleFilterChange(f)}
+            >
+              {FILTER_LABELS[f]}
+            </button>
+          ))}
+        </div>
+
+        {!data ? (
+          <SkeletonList rows={3} height={140} />
+        ) : filteredBookings.length === 0 ? (
+          <EmptyState icon={<IconCalendar />} title="No bookings here" text="There are no bookings with this status." />
+        ) : (
+          filteredBookings.map((booking: any) => (
+            <div key={booking.id} className="card">
+              <div className="stack" style={{ gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <DateChip date={booking.date} />
+                  <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
+                    <div style={{ fontWeight: 650, fontSize: '1.2rem' }}>
+                      {booking.requesterName} · <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>{booking.bookingRef}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-2)', marginTop: '0.15rem' }}>
+                      {booking.hall} · {longDate(booking.date)} · {booking.startTime} – {booking.endTime}
+                    </div>
+                  </div>
+                  <StatusBadge status={booking.status} />
+                </div>
+                <dl className="details">
+                  <div><dt>Purpose</dt><dd>{booking.purpose}</dd></div>
+                  <div><dt>Contact</dt><dd style={{ wordBreak: 'break-word' }}>{booking.email} · {booking.phone}</dd></div>
+                {booking.paymentRef && (
+                  <div><dt>Payment reference</dt><dd>{booking.paymentRef}</dd></div>
+                )}
+                {booking.amount != null && (
+                  <div><dt>Amount</dt><dd>LKR{' '}
+                    {Number(booking.amount).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}</dd>
+                  </div>
+                )}
+                </dl>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
+                {/* Every decision is made in one place: the Approvals queue. */}
+                {(booking.status === 'REQUESTED' ||
+                  (booking.status === 'APPROVED_PENDING_PAYMENT' && booking.slipUrl)) && (
+                  <a href="/admin/approvals?filter=SUBMITTED" className="btn btn-sm">
+                    {booking.status === 'REQUESTED' ? 'Review request in Approvals' : 'Check payment in Approvals'}
+                  </a>
+                )}
+                {booking.slipUrl && (
+                  <a href={booking.slipUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
+                    View Receipt
+                  </a>
+                )}
+                  <button
+                    className="btn-quiet danger"
+                    style={{ marginLeft: 'auto' }}
+                    onClick={async () => {
+                      if (!window.confirm(`Are you sure you want to request deletion of booking ${booking.bookingRef}? This will require approval before the booking is deleted.`)) {
+                        return;
+                      }
+                      try {
+                        const res = await fetch(`/api/admin/bookings/${booking.id}`, {
+                          method: 'DELETE',
+                        });
+                        if (res.ok) {
+                          alert('Delete request submitted for approval');
+                          mutate();
+                        } else {
+                          const error = await res.json();
+                          alert(error.error || 'Failed to submit delete request');
+                        }
+                      } catch (error) {
+                        alert('Failed to submit delete request');
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+                <div style={{ color: 'var(--text-3)', fontSize: '0.95rem' }}>
+                  Requested {new Date(booking.createdAt).toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}
+                </div>
+              </div>
+            </div>
+          ))
         )}
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="label">LKR per 30 minutes</label>
+      </div>
+
+      <div className="card stack" style={{ gap: '1rem' }}>
+        <div>
+          <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>Hall hire pricing</h2>
+          <p style={{ margin: 0, color: 'var(--text-2)' }}>
+            The amount charged per <strong>30-minute block</strong>. Public bookings multiply the number of blocks
+            (rounded up) by this rate to show an estimated total. A change needs a second administrator to approve it.
+          </p>
+        </div>
+        {hallSettingsLoading && <p style={{ margin: 0, color: 'var(--text-3)' }}>Loading current rate…</p>}
+        {hallSettingsError && (
+          <div className="alert alert-error" role="alert">
+            Could not load hall pricing: {hallSettingsError.message}. If you recently ran a database migration, restart
+            the dev server and run <code>npx prisma generate</code>.
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.75rem' }}>
+          <div style={{ flex: '0 1 16rem' }}>
+            <label className="label" htmlFor="hall-rate">LKR per 30 minutes</label>
             <input
-              className="input max-w-xs"
+              id="hall-rate"
+              className="input"
               type="number"
               min={0}
               step="0.01"
@@ -133,7 +251,7 @@ function AdminBookingsPageContent() {
                   return;
                 }
                 await mutateHallSettings();
-                alert('Hall hire rate saved');
+                alert(data.message || 'Sent for approval');
               } finally {
                 setRateSaving(false);
               }
@@ -143,271 +261,6 @@ function AdminBookingsPageContent() {
           </button>
         </div>
       </div>
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-2xl font-semibold">Admin — Bookings</h1>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => handleFilterChange('all')}
-          >
-            All
-          </button>
-          <button
-            className={`filter-btn ${filter === 'REQUESTED' ? 'active' : ''}`}
-            onClick={() => handleFilterChange('REQUESTED')}
-          >
-            Pending
-          </button>
-          <button
-            className={`filter-btn ${filter === 'APPROVED_PENDING_PAYMENT' ? 'active' : ''}`}
-            onClick={() => handleFilterChange('APPROVED_PENDING_PAYMENT')}
-          >
-            Approved
-          </button>
-          <button
-            className={`filter-btn ${filter === 'BOOKED_PAID' ? 'active' : ''}`}
-            onClick={() => handleFilterChange('BOOKED_PAID')}
-          >
-            Paid
-          </button>
-          <button
-            className={`filter-btn ${filter === 'REJECTED' ? 'active' : ''}`}
-            onClick={() => handleFilterChange('REJECTED')}
-          >
-            Rejected
-          </button>
-          <button
-            className={`filter-btn ${filter === 'AUTO_CANCELLED' ? 'active' : ''}`}
-            onClick={() => handleFilterChange('AUTO_CANCELLED')}
-          >
-            Auto-cancelled
-          </button>
-        </div>
-      </div>
-      <div className="grid gap-3">
-        {filteredBookings.length === 0 ? (
-          <div className="card text-center py-8">
-            <p className="text-gray-500">No bookings found for the selected filter.</p>
-          </div>
-        ) : (
-          filteredBookings.map((booking: any) => (
-            <div key={booking.id} className="card">
-              <div className="grid gap-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-semibold text-lg">
-                      {booking.bookingRef} - {booking.requesterName}
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {booking.email} · {booking.phone}
-                    </div>
-                  </div>
-                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    booking.status === 'BOOKED_PAID' ? 'bg-green-100 text-green-800' :
-                    booking.status === 'APPROVED_PENDING_PAYMENT' ? 'bg-yellow-100 text-yellow-800' :
-                    booking.status === 'REQUESTED' ? 'bg-blue-100 text-blue-800' :
-                    booking.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                    booking.status === 'AUTO_CANCELLED' ? 'bg-orange-100 text-orange-900' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {booking.status.replace(/_/g, ' ')}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <strong>Hall:</strong> {booking.hall}
-                  </div>
-                  <div>
-                    <strong>Date:</strong> {new Date(booking.date).toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </div>
-                  <div>
-                    <strong>Time:</strong> {booking.startTime} - {booking.endTime}
-                  </div>
-                  <div>
-                    <strong>Purpose:</strong> {booking.purpose}
-                  </div>
-                </div>
-                {booking.paymentRef && (
-                  <div className="text-sm">
-                    <strong>Payment Ref:</strong> {booking.paymentRef}
-                  </div>
-                )}
-                {booking.amount != null && (
-                  <div className="text-sm">
-                    <strong>Amount:</strong> LKR{' '}
-                    {Number(booking.amount).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })}
-                  </div>
-                )}
-                {booking.status === 'REQUESTED' && (
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      className="btn"
-                      style={{ background: 'linear-gradient(135deg, rgb(34, 197, 94), rgb(22, 163, 74))', color: 'white' }}
-                      onClick={async () => {
-                        if (!window.confirm(`Approve booking request ${booking.bookingRef}?`)) {
-                          return;
-                        }
-                        try {
-                          // Find the approval record for this booking
-                          const approvalRes = await fetch('/api/approvals');
-                          const approvalData = await approvalRes.json();
-                          const approval = approvalData.list?.find((a: any) => 
-                            a.resourceType === 'booking' && 
-                            a.resourceId === booking.id && 
-                            a.status === 'SUBMITTED'
-                          );
-                          
-                          if (!approval) {
-                            alert('Approval record not found. Please use the Approvals Queue.');
-                            return;
-                          }
-                          
-                          const res = await fetch('/api/approvals/approve', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              resourceType: 'booking',
-                              resourceId: booking.id,
-                              comment: 'Approved'
-                            })
-                          });
-                          
-                          if (res.ok) {
-                            alert('Booking approved successfully');
-                            mutate();
-                          } else {
-                            const error = await res.json();
-                            alert(error.error || 'Failed to approve booking');
-                          }
-                        } catch (error) {
-                          alert('Failed to approve booking');
-                        }
-                      }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="btn"
-                      style={{ background: 'linear-gradient(135deg, rgb(239, 68, 68), rgb(220, 38, 38))', color: 'white' }}
-                      onClick={async () => {
-                        const reason = window.prompt('Please provide a reason for rejection (required):');
-                        if (!reason || reason.trim() === '') {
-                          alert('Rejection reason is required');
-                          return;
-                        }
-                        if (!window.confirm(`Reject booking request ${booking.bookingRef}?`)) {
-                          return;
-                        }
-                        try {
-                          const res = await fetch('/api/approvals/reject', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              resourceType: 'booking',
-                              resourceId: booking.id,
-                              comment: reason.trim()
-                            })
-                          });
-                          
-                          if (res.ok) {
-                            alert('Booking rejected successfully');
-                            mutate();
-                          } else {
-                            const error = await res.json();
-                            alert(error.error || 'Failed to reject booking');
-                          }
-                        } catch (error) {
-                          alert('Failed to reject booking');
-                        }
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                )}
-                {booking.slipUrl && booking.status === 'APPROVED_PENDING_PAYMENT' && (
-                  <div className="mt-2 flex gap-2">
-                    <a 
-                      href={booking.slipUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="btn btn-secondary"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      View Receipt
-                    </a>
-                    <button
-                      className="btn btn-primary"
-                      onClick={async () => {
-                        if (!window.confirm('Confirm that payment receipt is valid and mark booking as fully paid?')) {
-                          return;
-                        }
-                        try {
-                          const res = await fetch(`/api/admin/bookings/${booking.id}/confirm-payment`, {
-                            method: 'POST',
-                          });
-                          if (res.ok) {
-                            alert('Payment confirmed successfully');
-                            mutate();
-                          } else {
-                            const error = await res.json();
-                            alert(error.error || 'Failed to confirm payment');
-                          }
-                        } catch (error) {
-                          alert('Failed to confirm payment');
-                        }
-                      }}
-                    >
-                      Confirm Payment
-                    </button>
-                  </div>
-                )}
-                <div className="mt-2 flex gap-2">
-                  <button
-                    className="btn btn-delete"
-                    style={{ 
-                      padding: '0.5rem 1rem', 
-                      fontSize: '0.875rem'
-                    }}
-                    onClick={async () => {
-                      if (!window.confirm(`Are you sure you want to request deletion of booking ${booking.bookingRef}? This will require approval before the booking is deleted.`)) {
-                        return;
-                      }
-                      try {
-                        const res = await fetch(`/api/admin/bookings/${booking.id}`, {
-                          method: 'DELETE',
-                        });
-                        if (res.ok) {
-                          alert('Delete request submitted for approval');
-                          mutate();
-                        } else {
-                          const error = await res.json();
-                          alert(error.error || 'Failed to submit delete request');
-                        }
-                      } catch (error) {
-                        alert('Failed to submit delete request');
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-                <div className="text-xs text-gray-500 mt-2">
-                  Created: {new Date(booking.createdAt).toLocaleString()}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }
@@ -416,8 +269,8 @@ export default function AdminBookingsPage() {
   return (
     <Suspense
       fallback={
-        <div className="container py-8 text-slate-600" aria-busy="true">
-          Loading bookings…
+        <div style={{ paddingTop: '2rem' }}>
+          <SkeletonList rows={3} height={140} />
         </div>
       }
     >

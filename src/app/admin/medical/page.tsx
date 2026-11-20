@@ -1,6 +1,8 @@
 'use client';
 import useSWR from 'swr';
 import { useState } from 'react';
+import { PageHeader, ADMIN_BACK, EmptyState, SkeletonList, longDate } from '@/components/ui';
+import { IconHeart } from '@/components/Icons';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -84,119 +86,144 @@ export default function MedicalEquipmentPage() {
     }
   };
 
+  const loanStatus = (loan: any): [string, string] =>
+    loan.returned ? ['Returned', 'badge-green']
+    : loan.issuedAt ? ['On loan', 'badge-blue']
+    : loan.approvedByAdminId ? ['Approved – ready to hand over', 'badge-blue']
+    : ['Waiting for approval', 'badge-amber'];
+
+  const items = data?.items || [];
+  const loans = data?.loans || [];
+
   return (
-    <div className="grid gap-4">
-      <h1 className="text-2xl font-semibold">Medical Equipment</h1>
+    <div className="page">
+      <PageHeader
+        back={ADMIN_BACK}
+        title="Medical equipment"
+        subtitle="Wheelchairs, walkers and other aids the church lends to members."
+      />
 
-      {/* Create Item Form */}
-      <form onSubmit={submitItem} className="card grid gap-3">
-        <h2 className="text-lg font-semibold">Add Medical Item</h2>
-        <div>
-          <label className="label">Item Name</label>
-          <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-        </div>
-        <div>
-          <label className="label">Total Quantity</label>
-          <input className="input" type="number" value={form.quantityTotal} onChange={e => setForm({ ...form, quantityTotal: Number(e.target.value) })} required min="1" />
-        </div>
-        <div>
-          <label className="label">Notes</label>
-          <textarea className="input" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} />
-        </div>
-        <button className="btn w-fit">Create Item</button>
-      </form>
+      <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))', alignItems: 'start' }}>
+        {/* Create Loan Form */}
+        <form onSubmit={submitLoan} className="card">
+          <h2 className="section-label">Lend an item</h2>
+          <div className="form-grid">
+            <div>
+              <label className="label" htmlFor="loan-item">Item</label>
+              <select id="loan-item" className="input" value={loanForm.itemId} onChange={e => setLoanForm({ ...loanForm, itemId: Number(e.target.value) })} required>
+                <option value="0">Select an item</option>
+                {items.filter((item: any) => item.quantityAvailable > 0).map((item: any) => (
+                  <option key={item.id} value={item.id}>{item.name} ({item.quantityAvailable} available)</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="loan-to">Given To</label>
+              <input id="loan-to" className="input" value={loanForm.givenTo} onChange={e => setLoanForm({ ...loanForm, givenTo: e.target.value })} placeholder="Full name of the person" required />
+            </div>
+            <div>
+              <label className="label" htmlFor="loan-due">Due Date</label>
+              <input id="loan-due" className="input" type="date" value={loanForm.dueDate} onChange={e => setLoanForm({ ...loanForm, dueDate: e.target.value })} />
+              <p className="hint">Optional. When the item should come back.</p>
+            </div>
+          </div>
+          <button className="btn" style={{ marginTop: '1.5rem' }}>Create Loan Request</button>
+        </form>
 
-      {/* Create Loan Form */}
-      <form onSubmit={submitLoan} className="card grid gap-3">
-        <h2 className="text-lg font-semibold">Create Loan Request</h2>
-        <div>
-          <label className="label">Item</label>
-          <select className="input" value={loanForm.itemId} onChange={e => setLoanForm({ ...loanForm, itemId: Number(e.target.value) })} required>
-            <option value="0">Select an item</option>
-            {(data?.items || []).filter((item: any) => item.quantityAvailable > 0).map((item: any) => (
-              <option key={item.id} value={item.id}>{item.name} ({item.quantityAvailable} available)</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label">Given To</label>
-          <input className="input" value={loanForm.givenTo} onChange={e => setLoanForm({ ...loanForm, givenTo: e.target.value })} required />
-        </div>
-        <div>
-          <label className="label">Due Date</label>
-          <input className="input" type="date" value={loanForm.dueDate} onChange={e => setLoanForm({ ...loanForm, dueDate: e.target.value })} />
-        </div>
-        <button className="btn w-fit">Create Loan Request</button>
-      </form>
-
-      {/* Items List */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Medical Items</h2>
-        <div className="grid gap-2">
-          {(data?.items || []).length === 0 ? (
-            <p className="text-gray-500">No medical items yet.</p>
-          ) : (
-            (data?.items || []).map((item: any) => (
-              <div key={item.id} className="card">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-semibold">{item.name}</div>
-                    <div className="text-sm text-gray-600">
-                      Total: {item.quantityTotal} · Available: {item.quantityAvailable} · Loaned: {item.quantityTotal - item.quantityAvailable}
-                    </div>
-                    {item.notes && <div className="text-sm text-gray-500 mt-1">{item.notes}</div>}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        {/* Create Item Form */}
+        <form onSubmit={submitItem} className="card">
+          <h2 className="section-label">Add a new item</h2>
+          <div className="form-grid">
+            <div>
+              <label className="label" htmlFor="item-name">Item Name</label>
+              <input id="item-name" className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="For example: Wheelchair" required />
+            </div>
+            <div>
+              <label className="label" htmlFor="item-qty">Total Quantity</label>
+              <input id="item-qty" className="input" type="number" value={form.quantityTotal} onChange={e => setForm({ ...form, quantityTotal: Number(e.target.value) })} required min="1" />
+            </div>
+            <div>
+              <label className="label" htmlFor="item-notes">Notes</label>
+              <textarea id="item-notes" className="input" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} />
+            </div>
+          </div>
+          <button className="btn-secondary" style={{ marginTop: '1.5rem' }}>Create Item</button>
+        </form>
       </div>
 
       {/* Loans List */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Loans</h2>
-        <div className="grid gap-2">
-          {(data?.loans || []).length === 0 ? (
-            <p className="text-gray-500">No loans yet.</p>
-          ) : (
-            (data?.loans || []).map((loan: any) => (
-              <div key={loan.id} className="card">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-semibold">{loan.item.name} → {loan.givenTo}</div>
-                    <div className="text-sm text-gray-600">
-                      Requested: {new Date(loan.requestDate).toLocaleDateString()}
-                      {loan.approvedAt && ` · Approved: ${new Date(loan.approvedAt).toLocaleDateString()}`}
-                      {loan.issuedAt && ` · Issued: ${new Date(loan.issuedAt).toLocaleDateString()}`}
-                      {loan.dueDate && ` · Due: ${new Date(loan.dueDate).toLocaleDateString()}`}
-                      {loan.returned && loan.returnedAt && ` · Returned: ${new Date(loan.returnedAt).toLocaleDateString()}`}
-                    </div>
+      <section>
+        <h2 className="section-label">Loans</h2>
+        {!data ? (
+          <SkeletonList rows={2} />
+        ) : loans.length === 0 ? (
+          <EmptyState icon={<IconHeart />} title="No loans yet" text="Items you lend will appear here." />
+        ) : (
+          <div className="list-group">
+            {loans.map((loan: any) => {
+              const [label, tone] = loanStatus(loan);
+              return (
+                <div key={loan.id} className="list-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                  <div className="list-row-main" style={{ flexBasis: '18rem' }}>
+                    <span className="list-row-title">{loan.item.name} – {loan.givenTo}</span>
+                    <span className="list-row-meta">
+                      Requested {longDate(loan.requestDate)}
+                      {loan.issuedAt && ` · Handed over ${longDate(loan.issuedAt)}`}
+                    </span>
+                    {loan.dueDate && !loan.returned && (
+                      <span className="list-row-meta">Due back {longDate(loan.dueDate)}</span>
+                    )}
+                    {loan.returned && loan.returnedAt && (
+                      <span className="list-row-meta">Returned {longDate(loan.returnedAt)}</span>
+                    )}
                     {loan.conditionOnReturn && (
-                      <div className="text-sm text-gray-500 mt-1">Condition on return: {loan.conditionOnReturn}</div>
+                      <span className="list-row-meta">Condition on return: {loan.conditionOnReturn}</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    {!loan.approvedByAdminId && (
-                      <button className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }} onClick={() => approveLoan(loan.id)}>Approve</button>
-                    )}
-                    {loan.approvedByAdminId && !loan.issuedAt && (
-                      <button className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }} onClick={() => issueLoan(loan.id)}>Issue</button>
-                    )}
-                    {loan.issuedAt && !loan.returned && (
-                      <button className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }} onClick={() => {
-                        const condition = prompt('Condition on return:');
-                        if (condition !== null) returnLoan(loan.id, condition);
-                      }}>Mark Returned</button>
-                    )}
-                  </div>
+                  <span className={`badge ${tone}`}>{label}</span>
+                  {!loan.approvedByAdminId && (
+                    <button className="btn btn-sm" onClick={() => approveLoan(loan.id)}>Approve</button>
+                  )}
+                  {loan.approvedByAdminId && !loan.issuedAt && (
+                    <button className="btn btn-sm" onClick={() => issueLoan(loan.id)}>Issue</button>
+                  )}
+                  {loan.issuedAt && !loan.returned && (
+                    <button className="btn-secondary btn-sm" onClick={() => {
+                      const condition = prompt('Condition on return:');
+                      if (condition !== null) returnLoan(loan.id, condition);
+                    }}>Mark Returned</button>
+                  )}
                 </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Items List */}
+      <section>
+        <h2 className="section-label">Items</h2>
+        {!data ? (
+          <SkeletonList rows={2} />
+        ) : items.length === 0 ? (
+          <EmptyState icon={<IconHeart />} title="No medical items yet" text="Add an item using the form above." />
+        ) : (
+          <div className="list-group">
+            {items.map((item: any) => (
+              <div key={item.id} className="list-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                <div className="list-row-main" style={{ flexBasis: '16rem' }}>
+                  <span className="list-row-title">{item.name}</span>
+                  {item.notes && <span className="list-row-meta">{item.notes}</span>}
+                </div>
+                <span className="list-row-meta" style={{ marginTop: 0 }}>
+                  <strong style={{ color: 'var(--text)', fontSize: '1.15rem' }}>{item.quantityAvailable}</strong> of {item.quantityTotal} available
+                  {item.quantityTotal - item.quantityAvailable > 0 && ` · ${item.quantityTotal - item.quantityAvailable} on loan`}
+                </span>
               </div>
-            ))
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
-

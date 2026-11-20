@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
+import { audit } from '@/lib/audit';
+import { requireRole, guardAdmin } from '@/lib/auth';
 import { parseChurchBankAccountPayload } from '@/lib/churchBankAccountValidation';
 import { prisma } from '@/lib/prisma';
 
@@ -45,10 +46,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const u = requireRole(['admin', 'staff']);
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const u = g.user;
   try {
     const body = await req.json().catch(() => null);
     const parsed = parseChurchBankAccountPayload(body);
@@ -89,11 +89,12 @@ export async function POST(req: Request) {
     });
 
     await submitApproval('church_bank_account', proposal.id, 'update', u.id);
+    await audit(u.id, 'request_update_church_bank_account', 'church_bank_account', proposal.id, null, parsed.data);
 
     return NextResponse.json({
       ok: true,
       proposalId: proposal.id,
-      message: 'Submitted for approval. Another admin or staff member can approve it in the Approvals queue.'
+      message: 'Submitted for approval. A different administrator must approve it in the Approvals page before it is used in booking emails.'
     });
   } catch (e) {
     console.error('POST /api/admin/church-bank-account', e);

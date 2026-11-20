@@ -1,34 +1,22 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
+import { guardAdmin } from '@/lib/auth';
+import { audit } from '@/lib/audit';
 
 export async function POST(req: Request) {
-  const u = requireRole(['admin', 'staff']);
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const body = await req.json().catch(() => ({}));
+  const name = String(body?.name ?? '').trim();
+  const quantityTotal = Number(body?.quantityTotal);
+  if (!name || !Number.isInteger(quantityTotal) || quantityTotal < 1) {
+    return NextResponse.json({ error: 'Please enter the item name and how many the church has (1 or more).' }, { status: 400 });
   }
-
-  try {
-    const body = await req.json();
-    const { name, quantityTotal, notes } = body;
-    
-    if (!name || !quantityTotal || quantityTotal < 1) {
-      return NextResponse.json({ error: 'Name and quantity (>=1) are required' }, { status: 400 });
-    }
-
-    const created = await prisma.medicalItem.create({
-      data: {
-        name,
-        quantityTotal: Number(quantityTotal),
-        quantityAvailable: Number(quantityTotal),
-        notes: notes || null
-      }
-    });
-
-    return NextResponse.json({ ok: true, id: created.id });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/medical/items:', error);
-    return NextResponse.json({ error: 'Failed to create medical item' }, { status: 500 });
-  }
+  const created = await prisma.medicalItem.create({
+    data: { name, quantityTotal, quantityAvailable: quantityTotal, notes: body?.notes ? String(body.notes) : null },
+  });
+  await audit(g.user.id, 'create_medical_item', 'medical_item', created.id, null, created);
+  return NextResponse.json({ ok: true, id: created.id });
 }
 
+export const dynamic = 'force-dynamic';

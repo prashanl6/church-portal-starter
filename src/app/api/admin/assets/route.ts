@@ -1,44 +1,47 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { getUserFromCookie } from '@/lib/auth';
+import { guardAdmin, guardStaffOrAdmin } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
+import { assetSchema, firstIssue } from '@/lib/validate';
 
 export async function GET() {
-  // Get all assets including pending ones (those with pending approvals)
-  const assets = await prisma.asset.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
-  
-  // Get approval status for each asset
-  const assetsWithApproval = await Promise.all(assets.map(async (asset) => {
-    const approval = await prisma.approval.findFirst({
-      where: {
-        resourceType: 'asset',
-        resourceId: asset.id
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-    
+  const g = guardStaffOrAdmin();
+  if ('response' in g) return g.response;
+
+  const assets = await prisma.asset.findMany({ orderBy: { createdAt: 'desc' }, take: 500 });
+  const approvals = await prisma.approval.findMany({
+    where: { resourceType: 'asset', resourceId: { in: assets.map((a) => a.id) } },
+    orderBy: { createdAt: 'desc' },
+    select: { resourceId: true, status: true, action: true },
+  });
+  const latest = new Map<number, { status: string; action: string }>();
+  for (const a of approvals) if (!latest.has(a.resourceId)) latest.set(a.resourceId, a);
+
+  const list = assets.map((asset) => {
+    const ap = latest.get(asset.id);
     return {
       ...asset,
-      approvalStatus: approval ? approval.status : 'APPROVED', // If no approval record, assume approved (old assets)
-      approvalAction: approval ? approval.action : null // Include the action type (create, update, delete)
+      approvalStatus: ap ? ap.status : 'APPROVED', // no record = older, already-approved asset
+      approvalAction: ap ? ap.action : null,
     };
-  }));
-  
-  return NextResponse.json({ list: assetsWithApproval });
+  });
+  return NextResponse.json({ list });
 }
 
 export async function POST(req: Request) {
-  const u = getUserFromCookie();
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
-  if (u.role !== 'admin') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-  }
-  const body = await req.json();
-  const created = await prisma.asset.create({ data: body });
-  await submitApproval('asset', created.id, 'create', u.id);
-  await audit(u.id, 'create_draft_asset', 'asset', created.id, null, created);
-  return NextResponse.json({ ok: true, id: created.id });
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const u = g.user;
+
+  const parsed = assetSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
+
+  // Saved as "pending": it is not part of the register until another admin approves.
+  const created = await prisma.asset.create({ data: { ...parsed.data, status: 'pending' } });
+  await submitApproval('asset', created.id, 'create', u.id, parsed.data);
+  await audit(u.id, 'request_create_asset', 'asset', created.id, null, created);
+  return NextResponse.json({ ok: true, id: created.id, message: 'Saved. Another administrator must approve it before it appears in the register.' });
 }
+
+export const dynamic = 'force-dynamic';

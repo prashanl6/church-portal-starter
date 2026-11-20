@@ -1,8 +1,21 @@
 'use client';
 import useSWR, { useSWRConfig } from 'swr';
+import { PageHeader, ADMIN_BACK, StatusBadge, DateChip, RowChevron, longDate } from '@/components/ui';
 import { useEffect, useState } from 'react';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+/** Show the server's plain-English message (or a fallback) after a save. */
+async function showResult(res: Response, fallbackOk: string, fallbackErr: string): Promise<boolean> {
+  const body = await res.json().catch(() => ({} as any));
+  if (res.status === 401) {
+    alert('Your session has expired. Please log in again.');
+    window.location.href = '/login';
+    return false;
+  }
+  alert(res.ok ? body.message || fallbackOk : body.error || fallbackErr);
+  return res.ok;
+}
 
 /** Active-only select list may omit partners on inactive anniversaries; merge so dropdowns stay valid. */
 function selectOptionsWithIndividuals(
@@ -146,17 +159,9 @@ export default function PeopleEventsPage() {
         notes: birthdayForm.notes || null
       })
     });
-    if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
-      return;
-    }
-    if (res.ok) {
-      alert('Individual added');
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setBirthdayForm({ displayName: '', birthDate: '', email: '', phone: '', notes: '' });
       await refreshBirthdays();
-    } else {
-      alert((await res.text()) || 'Failed to create');
     }
   };
 
@@ -176,17 +181,9 @@ export default function PeopleEventsPage() {
         notes: anniversaryForm.notes || null
       })
     });
-    if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
-      return;
-    }
-    if (res.ok) {
-      alert('Anniversary added');
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setAnniversaryForm({ individualAId: '', individualBId: '', anniversaryDate: '', notes: '' });
       await refreshAnniversaries();
-    } else {
-      alert((await res.text()) || 'Failed to create');
     }
   };
 
@@ -196,8 +193,7 @@ export default function PeopleEventsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: currentStatus === 'active' ? 'inactive' : 'active' })
     });
-    if (res.ok) await refreshBirthdays();
-    else alert('Failed to update status');
+    if (await showResult(res, 'Sent for approval.', 'Could not change the status.')) await refreshBirthdays();
   };
 
   const toggleAnniversaryStatus = async (id: number, currentStatus: string) => {
@@ -206,8 +202,7 @@ export default function PeopleEventsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: currentStatus === 'active' ? 'inactive' : 'active' })
     });
-    if (res.ok) await refreshAnniversaries();
-    else alert('Failed to update status');
+    if (await showResult(res, 'Sent for approval.', 'Could not change the status.')) await refreshAnniversaries();
   };
 
   const saveDateOfDeath = async (id: number) => {
@@ -219,15 +214,10 @@ export default function PeopleEventsPage() {
         dateOfDeath: raw ? new Date(raw).toISOString() : null
       })
     });
-    if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
-      return;
-    }
-    if (res.ok) {
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setExpandedIndividualId(null);
       await refreshBirthdays();
-    } else alert((await res.text()) || 'Failed to save');
+    }
   };
 
   const openIndividualDetails = (row: { id: number; dateOfDeath?: string | null }) => {
@@ -261,11 +251,11 @@ export default function PeopleEventsPage() {
         individualBId: Number(anniversaryDraft.individualBId)
       })
     });
-    if (res.ok) {
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setExpandedAnniversaryId(null);
       setAnniversaryDraft(null);
       await refreshAnniversaries();
-    } else alert((await res.text()) || 'Failed to save');
+    }
   };
 
   const loadBirthdayRange = () => {
@@ -310,17 +300,20 @@ export default function PeopleEventsPage() {
   const upcomingAnnList = upcomingAnnData?.list ?? [];
 
   return (
-    <div className="grid gap-4">
-      <h1 className="text-2xl font-semibold">Birthdays &amp; Anniversaries</h1>
+    <div className="page">
+      <PageHeader
+        back={ADMIN_BACK}
+        eyebrow="People"
+        title="Birthdays &amp; Anniversaries"
+        subtitle="New people, anniversaries and changes go to a second administrator for approval before they are saved."
+      />
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Section">
+      <div className="segmented" role="tablist" aria-label="Section" style={{ justifySelf: 'start' }}>
         <button
           type="button"
           role="tab"
           aria-selected={tab === 'upcoming'}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            tab === 'upcoming' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-          }`}
+          className={tab === 'upcoming' ? 'is-active' : ''}
           onClick={() => setTab('upcoming')}
         >
           Next {NEXT_DAYS} days
@@ -329,9 +322,7 @@ export default function PeopleEventsPage() {
           type="button"
           role="tab"
           aria-selected={tab === 'birthday'}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            tab === 'birthday' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-          }`}
+          className={tab === 'birthday' ? 'is-active' : ''}
           onClick={() => setTab('birthday')}
         >
           Birthdays
@@ -340,9 +331,7 @@ export default function PeopleEventsPage() {
           type="button"
           role="tab"
           aria-selected={tab === 'anniversary'}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            tab === 'anniversary' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-          }`}
+          className={tab === 'anniversary' ? 'is-active' : ''}
           onClick={() => setTab('anniversary')}
         >
           Anniversaries
@@ -351,9 +340,7 @@ export default function PeopleEventsPage() {
           type="button"
           role="tab"
           aria-selected={tab === 'deactivated'}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            tab === 'deactivated' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-          }`}
+          className={tab === 'deactivated' ? 'is-active' : ''}
           onClick={() => setTab('deactivated')}
         >
           Deactivated
@@ -368,72 +355,46 @@ export default function PeopleEventsPage() {
             partners are active (deceased excluded).
           </p>
           <div>
-            <h2 className="text-lg font-semibold mb-3">Birthdays</h2>
+            <h2 className="section-label">Birthdays</h2>
             {upcomingIndList.length === 0 ? (
               <p className="text-gray-500">None in this window.</p>
             ) : (
-              <div className="grid gap-2">
+              <div className="list-group">
                 {upcomingIndList.map((e: any) => (
-                  <div key={e.id} className="card">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-semibold">
-                          {'\u{1F382}'} {e.displayName}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {e.birthDate
-                            ? new Date(e.birthDate).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })
-                            : 'No date of birth'}
-                          {e.email && ` · ${e.email}`}
-                        </div>
-                      </div>
-                      <span
-                        className={`px-2 py-1 rounded text-sm ${
-                          e.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {e.status}
+                  <div key={e.id} className="list-row" style={{ cursor: 'default' }}>
+                    {e.birthDate && <DateChip date={e.birthDate} />}
+                    <span className="list-row-main">
+                      <span className="list-row-title">{e.displayName}</span>
+                      <span className="list-row-meta">
+                        {e.birthDate ? `Born ${longDate(e.birthDate)}` : 'No date of birth'}
+                        {e.email && ` · ${e.email}`}
                       </span>
-                    </div>
+                    </span>
+                    <StatusBadge status={e.status} />
                   </div>
                 ))}
               </div>
             )}
           </div>
           <div>
-            <h2 className="text-lg font-semibold mb-3">Anniversaries</h2>
+            <h2 className="section-label">Anniversaries</h2>
             {upcomingAnnList.length === 0 ? (
               <p className="text-gray-500">None in this window.</p>
             ) : (
-              <div className="grid gap-2">
+              <div className="list-group">
                 {upcomingAnnList.map((e: any) => (
-                  <div key={e.id} className="card">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-semibold">
-                          {'\u{1F492}'} {e.individualA?.displayName} &amp; {e.individualB?.displayName}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {new Date(e.anniversaryDate).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                          {e.notes && ` · ${e.notes}`}
-                        </div>
-                      </div>
-                      <span
-                        className={`px-2 py-1 rounded text-sm ${
-                          e.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {e.status}
+                  <div key={e.id} className="list-row" style={{ cursor: 'default' }}>
+                    <DateChip date={e.anniversaryDate} />
+                    <span className="list-row-main">
+                      <span className="list-row-title">
+                        {e.individualA?.displayName} &amp; {e.individualB?.displayName}
                       </span>
-                    </div>
+                      <span className="list-row-meta">
+                        Married {longDate(e.anniversaryDate)}
+                        {e.notes && ` · ${e.notes}`}
+                      </span>
+                    </span>
+                    <StatusBadge status={e.status} />
                   </div>
                 ))}
               </div>
@@ -447,15 +408,15 @@ export default function PeopleEventsPage() {
 
       {tab === 'birthday' && (
         <>
-          <div className="card grid gap-3">
+          <div className="card form-grid">
             <p className="text-sm text-gray-600">
               Choose a date range. Results load only after you click Load. Only <strong>active</strong> individuals
               with no date of death are included (birthday month/day falls on any day in the range).
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="label">From date</label>
-                <input
+                <label className="label" htmlFor="people-field-1">From date</label>
+                <input id="people-field-1"
                   className="input max-w-xs"
                   type="date"
                   value={birthdayFromInput}
@@ -463,8 +424,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">To date</label>
-                <input
+                <label className="label" htmlFor="people-field-2">To date</label>
+                <input id="people-field-2"
                   className="input max-w-xs"
                   type="date"
                   value={birthdayToInput}
@@ -489,7 +450,7 @@ export default function PeopleEventsPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold mb-3">Individuals</h2>
+            <h2 className="section-label">Individuals</h2>
             {!birthdayApplied ? (
               <p className="text-gray-500">Enter from and to dates, then click Load to see results.</p>
             ) : birthdayTotal === 0 ? (
@@ -498,33 +459,21 @@ export default function PeopleEventsPage() {
               <>
                 <p className="text-sm text-gray-600 mb-3">
                   {birthdayTotal} result{birthdayTotal !== 1 ? 's' : ''} ·{' '}
-                  {new Date(birthdayApplied.from + 'T12:00:00').toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}{' '}
+                  {new Date(birthdayApplied.from + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}{' '}
                   –{' '}
-                  {new Date(birthdayApplied.to + 'T12:00:00').toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
+                  {new Date(birthdayApplied.to + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
                 <div className="grid gap-2">
                   {birthdayList.map((e: any) => (
                     <div key={e.id} className="card">
-                      <div className="flex justify-between items-start gap-3">
+                      <div className="flex flex-wrap justify-between items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold">
-                            {'\u{1F382}'} {e.displayName}
+                            {e.displayName}
                           </div>
                           <div className="text-sm text-gray-600">
                             {e.birthDate
-                              ? new Date(e.birthDate).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                })
+                              ? longDate(e.birthDate)
                               : 'No date of birth'}
                             {e.email && ` · ${e.email}`}
                             {e.phone && ` · ${e.phone}`}
@@ -532,35 +481,23 @@ export default function PeopleEventsPage() {
                           {e.dateOfDeath && (
                             <div className="text-sm text-gray-500 mt-1">
                               Date of death:{' '}
-                              {new Date(e.dateOfDeath).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })}
+                              {longDate(e.dateOfDeath)}
                             </div>
                           )}
                           {e.notes && <div className="text-sm text-gray-500 mt-1">{e.notes}</div>}
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center shrink-0">
-                          <span
-                            className={`px-2 py-1 rounded text-sm text-center ${
-                              e.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {e.status}
-                          </span>
+                        <div className="flex flex-wrap gap-2 items-center shrink-0">
+                          <StatusBadge status={e.status} />
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => openIndividualDetails(e)}
                           >
                             Details
                           </button>
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => toggleIndividualStatus(e.id, e.status)}
                           >
                             {e.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -568,13 +505,13 @@ export default function PeopleEventsPage() {
                         </div>
                       </div>
                       {expandedIndividualId === e.id && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3">
+                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div>
-                            <label className="label">Date of death (optional)</label>
+                            <label className="label" htmlFor="people-field-3">Date of death (optional)</label>
                             <p className="text-xs text-gray-500 mb-2">
                               Saving a date of death deactivates this record automatically.
                             </p>
-                            <input
+                            <input id="people-field-3"
                               className="input max-w-xs"
                               type="date"
                               value={deathDateDraft[e.id] ?? ''}
@@ -604,12 +541,12 @@ export default function PeopleEventsPage() {
             )}
           </div>
 
-          <form onSubmit={submitBirthday} className="card grid gap-3">
-            <h2 className="text-lg font-semibold">Add individual (birthday)</h2>
+          <form onSubmit={submitBirthday} className="card form-grid">
+            <h2 className="section-label">Add individual (birthday)</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="label">Name</label>
-                <input
+                <label className="label" htmlFor="people-field-4">Name</label>
+                <input id="people-field-4"
                   className="input"
                   value={birthdayForm.displayName}
                   onChange={(ev) => setBirthdayForm({ ...birthdayForm, displayName: ev.target.value })}
@@ -617,8 +554,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">Date of birth</label>
-                <input
+                <label className="label" htmlFor="people-field-5">Date of birth</label>
+                <input id="people-field-5"
                   className="input"
                   type="date"
                   value={birthdayForm.birthDate}
@@ -629,8 +566,8 @@ export default function PeopleEventsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="label">Email (optional)</label>
-                <input
+                <label className="label" htmlFor="people-field-6">Email (optional)</label>
+                <input id="people-field-6"
                   className="input"
                   type="email"
                   value={birthdayForm.email}
@@ -638,8 +575,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">Phone (optional)</label>
-                <input
+                <label className="label" htmlFor="people-field-7">Phone (optional)</label>
+                <input id="people-field-7"
                   className="input"
                   type="tel"
                   value={birthdayForm.phone}
@@ -648,22 +585,22 @@ export default function PeopleEventsPage() {
               </div>
             </div>
             <div>
-              <label className="label">Notes (optional)</label>
-              <textarea
+              <label className="label" htmlFor="people-field-8">Notes (optional)</label>
+              <textarea id="people-field-8"
                 className="input"
                 value={birthdayForm.notes}
                 onChange={(ev) => setBirthdayForm({ ...birthdayForm, notes: ev.target.value })}
                 rows={3}
               />
             </div>
-            <button className="btn w-fit">Add individual</button>
+            <div><button className="btn">Add individual</button></div>
           </form>
         </>
       )}
 
       {tab === 'anniversary' && (
         <>
-          <div className="card grid gap-3">
+          <div className="card form-grid">
             <p className="text-sm text-gray-600">
               Choose a date range. Results load only after you click Load. Active anniversary records only, with{' '}
               <strong>both</strong> partners active and not deceased (anniversary month/day falls on any day in the
@@ -671,8 +608,8 @@ export default function PeopleEventsPage() {
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="label">From date</label>
-                <input
+                <label className="label" htmlFor="people-field-9">From date</label>
+                <input id="people-field-9"
                   className="input max-w-xs"
                   type="date"
                   value={anniversaryFromInput}
@@ -680,8 +617,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">To date</label>
-                <input
+                <label className="label" htmlFor="people-field-10">To date</label>
+                <input id="people-field-10"
                   className="input max-w-xs"
                   type="date"
                   value={anniversaryToInput}
@@ -706,7 +643,7 @@ export default function PeopleEventsPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold mb-3">Anniversaries</h2>
+            <h2 className="section-label">Anniversaries</h2>
             {!anniversaryApplied ? (
               <p className="text-gray-500">Enter from and to dates, then click Load to see results.</p>
             ) : anniversaryTotal === 0 ? (
@@ -715,55 +652,35 @@ export default function PeopleEventsPage() {
               <>
                 <p className="text-sm text-gray-600 mb-3">
                   {anniversaryTotal} result{anniversaryTotal !== 1 ? 's' : ''} ·{' '}
-                  {new Date(anniversaryApplied.from + 'T12:00:00').toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}{' '}
+                  {new Date(anniversaryApplied.from + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}{' '}
                   –{' '}
-                  {new Date(anniversaryApplied.to + 'T12:00:00').toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
+                  {new Date(anniversaryApplied.to + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
                 <div className="grid gap-2">
                   {anniversaryList.map((e: any) => (
                     <div key={e.id} className="card">
-                      <div className="flex justify-between items-start gap-3">
+                      <div className="flex flex-wrap justify-between items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold">
-                            {'\u{1F492}'} {e.individualA?.displayName} &amp; {e.individualB?.displayName}
+                            {e.individualA?.displayName} &amp; {e.individualB?.displayName}
                           </div>
                           <div className="text-sm text-gray-600">
-                            {new Date(e.anniversaryDate).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
+                            {longDate(e.anniversaryDate)}
                           </div>
                           {e.notes && <div className="text-sm text-gray-500 mt-1">{e.notes}</div>}
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center shrink-0">
-                          <span
-                            className={`px-2 py-1 rounded text-sm text-center ${
-                              e.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {e.status}
-                          </span>
+                        <div className="flex flex-wrap gap-2 items-center shrink-0">
+                          <StatusBadge status={e.status} />
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => openAnniversaryDetails(e)}
                           >
                             Details
                           </button>
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => toggleAnniversaryStatus(e.id, e.status)}
                           >
                             {e.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -771,11 +688,11 @@ export default function PeopleEventsPage() {
                         </div>
                       </div>
                       {expandedAnniversaryId === e.id && anniversaryDraft && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3">
+                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="label">Person 1</label>
-                              <select
+                              <label className="label" htmlFor="people-field-11">Person 1</label>
+                              <select id="people-field-11"
                                 className="input"
                                 value={anniversaryDraft.individualAId}
                                 onChange={(ev) =>
@@ -790,8 +707,8 @@ export default function PeopleEventsPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="label">Person 2</label>
-                              <select
+                              <label className="label" htmlFor="people-field-12">Person 2</label>
+                              <select id="people-field-12"
                                 className="input"
                                 value={anniversaryDraft.individualBId}
                                 onChange={(ev) =>
@@ -807,8 +724,8 @@ export default function PeopleEventsPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="label">Anniversary date</label>
-                            <input
+                            <label className="label" htmlFor="people-field-13">Anniversary date</label>
+                            <input id="people-field-13"
                               className="input max-w-xs"
                               type="date"
                               value={anniversaryDraft.anniversaryDate}
@@ -818,8 +735,8 @@ export default function PeopleEventsPage() {
                             />
                           </div>
                           <div>
-                            <label className="label">Notes</label>
-                            <textarea
+                            <label className="label" htmlFor="people-field-14">Notes</label>
+                            <textarea id="people-field-14"
                               className="input"
                               rows={2}
                               value={anniversaryDraft.notes}
@@ -852,15 +769,15 @@ export default function PeopleEventsPage() {
             )}
           </div>
 
-          <form onSubmit={submitAnniversary} className="card grid gap-3">
-            <h2 className="text-lg font-semibold">Add anniversary</h2>
+          <form onSubmit={submitAnniversary} className="card form-grid">
+            <h2 className="section-label">Add anniversary</h2>
             <p className="text-sm text-gray-600">
               Link two people already on file. Only anniversary date and notes are stored on this record.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="label">Person 1</label>
-                <select
+                <label className="label" htmlFor="people-field-15">Person 1</label>
+                <select id="people-field-15"
                   className="input"
                   value={anniversaryForm.individualAId}
                   onChange={(ev) => setAnniversaryForm({ ...anniversaryForm, individualAId: ev.target.value })}
@@ -875,8 +792,8 @@ export default function PeopleEventsPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Person 2</label>
-                <select
+                <label className="label" htmlFor="people-field-16">Person 2</label>
+                <select id="people-field-16"
                   className="input"
                   value={anniversaryForm.individualBId}
                   onChange={(ev) => setAnniversaryForm({ ...anniversaryForm, individualBId: ev.target.value })}
@@ -892,8 +809,8 @@ export default function PeopleEventsPage() {
               </div>
             </div>
             <div>
-              <label className="label">Anniversary date</label>
-              <input
+              <label className="label" htmlFor="people-field-17">Anniversary date</label>
+              <input id="people-field-17"
                 className="input max-w-xs"
                 type="date"
                 value={anniversaryForm.anniversaryDate}
@@ -902,15 +819,15 @@ export default function PeopleEventsPage() {
               />
             </div>
             <div>
-              <label className="label">Notes (optional)</label>
-              <textarea
+              <label className="label" htmlFor="people-field-18">Notes (optional)</label>
+              <textarea id="people-field-18"
                 className="input"
                 value={anniversaryForm.notes}
                 onChange={(ev) => setAnniversaryForm({ ...anniversaryForm, notes: ev.target.value })}
                 rows={2}
               />
             </div>
-            <button className="btn w-fit">Add anniversary</button>
+            <div><button className="btn">Add anniversary</button></div>
           </form>
         </>
       )}
@@ -924,7 +841,7 @@ export default function PeopleEventsPage() {
           </p>
 
           <div>
-            <h2 className="text-lg font-semibold mb-1">Individuals</h2>
+            <h2 className="section-label">Individuals</h2>
             <p className="text-sm text-gray-600 mb-3">Inactive people on file (birthdays / directory).</p>
             {deactivatedTotal === 0 ? (
               <p className="text-gray-500">No deactivated individuals.</p>
@@ -937,18 +854,14 @@ export default function PeopleEventsPage() {
                 <div className="grid gap-2">
                   {deactivatedList.map((e: any) => (
                     <div key={e.id} className="card">
-                      <div className="flex justify-between items-start gap-3">
+                      <div className="flex flex-wrap justify-between items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold">
-                            {'\u{1F382}'} {e.displayName}
+                            {e.displayName}
                           </div>
                           <div className="text-sm text-gray-600">
                             {e.birthDate
-                              ? new Date(e.birthDate).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                })
+                              ? longDate(e.birthDate)
                               : 'No date of birth'}
                             {e.email && ` · ${e.email}`}
                             {e.phone && ` · ${e.phone}`}
@@ -956,31 +869,23 @@ export default function PeopleEventsPage() {
                           {e.dateOfDeath && (
                             <div className="text-sm text-gray-500 mt-1">
                               Date of death:{' '}
-                              {new Date(e.dateOfDeath).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })}
+                              {longDate(e.dateOfDeath)}
                             </div>
                           )}
                           {e.notes && <div className="text-sm text-gray-500 mt-1">{e.notes}</div>}
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center shrink-0">
-                          <span className="px-2 py-1 rounded text-sm text-center bg-gray-100 text-gray-800">
-                            {e.status}
-                          </span>
+                        <div className="flex flex-wrap gap-2 items-center shrink-0">
+                          <StatusBadge status={e.status} />
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => openIndividualDetails(e)}
                           >
                             Details
                           </button>
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => toggleIndividualStatus(e.id, e.status)}
                           >
                             Reactivate
@@ -988,14 +893,14 @@ export default function PeopleEventsPage() {
                         </div>
                       </div>
                       {expandedIndividualId === e.id && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3">
+                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div>
-                            <label className="label">Date of death (optional)</label>
+                            <label className="label" htmlFor="people-field-19">Date of death (optional)</label>
                             <p className="text-xs text-gray-500 mb-2">
                               Clear this if it was set in error; saving empty does not auto-activate—you can use
                               Reactivate.
                             </p>
-                            <input
+                            <input id="people-field-19"
                               className="input max-w-xs"
                               type="date"
                               value={deathDateDraft[e.id] ?? ''}
@@ -1047,7 +952,7 @@ export default function PeopleEventsPage() {
           </div>
 
           <div className="border-t border-slate-200 pt-8">
-            <h2 className="text-lg font-semibold mb-1">Anniversaries</h2>
+            <h2 className="section-label">Anniversaries</h2>
             <p className="text-sm text-gray-600 mb-3">
               Anniversary records with status inactive (partners may still be active or inactive).
             </p>
@@ -1062,17 +967,13 @@ export default function PeopleEventsPage() {
                 <div className="grid gap-2">
                   {deactivatedAnnList.map((e: any) => (
                     <div key={e.id} className="card">
-                      <div className="flex justify-between items-start gap-3">
+                      <div className="flex flex-wrap justify-between items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold">
-                            {'\u{1F492}'} {e.individualA?.displayName} &amp; {e.individualB?.displayName}
+                            {e.individualA?.displayName} &amp; {e.individualB?.displayName}
                           </div>
                           <div className="text-sm text-gray-600">
-                            {new Date(e.anniversaryDate).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
+                            {longDate(e.anniversaryDate)}
                           </div>
                           {(e.individualA?.dateOfDeath || e.individualB?.dateOfDeath) && (
                             <div className="text-sm text-amber-800 mt-1">
@@ -1081,22 +982,18 @@ export default function PeopleEventsPage() {
                           )}
                           {e.notes && <div className="text-sm text-gray-500 mt-1">{e.notes}</div>}
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center shrink-0">
-                          <span className="px-2 py-1 rounded text-sm text-center bg-gray-100 text-gray-800">
-                            {e.status}
-                          </span>
+                        <div className="flex flex-wrap gap-2 items-center shrink-0">
+                          <StatusBadge status={e.status} />
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => openAnniversaryDetails(e)}
                           >
                             Details
                           </button>
                           <button
                             type="button"
-                            className="btn"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            className="btn-secondary btn-sm"
                             onClick={() => toggleAnniversaryStatus(e.id, e.status)}
                           >
                             Reactivate
@@ -1104,11 +1001,11 @@ export default function PeopleEventsPage() {
                         </div>
                       </div>
                       {expandedAnniversaryId === e.id && anniversaryDraft && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3">
+                        <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="label">Person 1</label>
-                              <select
+                              <label className="label" htmlFor="people-field-20">Person 1</label>
+                              <select id="people-field-20"
                                 className="input"
                                 value={anniversaryDraft.individualAId}
                                 onChange={(ev) =>
@@ -1127,8 +1024,8 @@ export default function PeopleEventsPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="label">Person 2</label>
-                              <select
+                              <label className="label" htmlFor="people-field-21">Person 2</label>
+                              <select id="people-field-21"
                                 className="input"
                                 value={anniversaryDraft.individualBId}
                                 onChange={(ev) =>
@@ -1148,8 +1045,8 @@ export default function PeopleEventsPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="label">Anniversary date</label>
-                            <input
+                            <label className="label" htmlFor="people-field-22">Anniversary date</label>
+                            <input id="people-field-22"
                               className="input max-w-xs"
                               type="date"
                               value={anniversaryDraft.anniversaryDate}
@@ -1159,8 +1056,8 @@ export default function PeopleEventsPage() {
                             />
                           </div>
                           <div>
-                            <label className="label">Notes</label>
-                            <textarea
+                            <label className="label" htmlFor="people-field-23">Notes</label>
+                            <textarea id="people-field-23"
                               className="input"
                               rows={2}
                               value={anniversaryDraft.notes}

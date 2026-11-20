@@ -26,9 +26,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const count = await prisma.user.count();
+  const count = await prisma.user.count({ where: { role: 'admin' } });
   if (count > 0) {
-    return NextResponse.json({ error: 'Users already exist' }, { status: 403 });
+    return NextResponse.json({ error: 'An administrator already exists' }, { status: 403 });
   }
 
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';

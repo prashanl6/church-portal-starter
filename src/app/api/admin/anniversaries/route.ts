@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
+import { requireRole, guardAdmin } from '@/lib/auth';
+import { submitApproval } from '@/lib/approval';
+import { audit } from '@/lib/audit';
+import { anniversaryCreateSchema, firstIssue } from '@/lib/validate';
 import { isOccasionInNextNDays, occasionMatchesAnyDayInRange } from '@/lib/peopleUpcoming';
 
 const PAGE_SIZE_DEFAULT = 25;
@@ -118,48 +121,26 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const u = requireRole(['admin', 'staff']);
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const u = g.user;
+
+  const parsed = anniversaryCreateSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
+  const { individualAId, individualBId } = parsed.data;
+  if (individualAId === individualBId) {
+    return NextResponse.json({ error: 'Please choose two different people.' }, { status: 400 });
   }
+  const found = await prisma.churchIndividual.count({ where: { id: { in: [individualAId, individualBId] } } });
+  if (found !== 2) return NextResponse.json({ error: 'One of the people was not found in the register.' }, { status: 400 });
 
-  try {
-    const body = await req.json();
-    const individualAId = Number(body.individualAId);
-    const individualBId = Number(body.individualBId);
-    const { anniversaryDate, notes } = body;
-
-    if (!individualAId || !individualBId || !anniversaryDate) {
-      return NextResponse.json(
-        { error: 'Two individuals and anniversary date are required' },
-        { status: 400 }
-      );
-    }
-    if (individualAId === individualBId) {
-      return NextResponse.json({ error: 'Choose two different individuals' }, { status: 400 });
-    }
-
-    const [a, b] = await Promise.all([
-      prisma.churchIndividual.findUnique({ where: { id: individualAId } }),
-      prisma.churchIndividual.findUnique({ where: { id: individualBId } })
-    ]);
-    if (!a || !b) {
-      return NextResponse.json({ error: 'Individual not found' }, { status: 400 });
-    }
-
-    const created = await prisma.weddingAnniversary.create({
-      data: {
-        individualAId,
-        individualBId,
-        anniversaryDate: new Date(anniversaryDate),
-        notes: notes || null,
-        status: 'active'
-      }
-    });
-
-    return NextResponse.json({ ok: true, id: created.id });
-  } catch (error: unknown) {
-    console.error('Error in POST /api/admin/anniversaries:', error);
-    return NextResponse.json({ error: 'Failed to create anniversary' }, { status: 500 });
-  }
+  const ap = await submitApproval('anniversary', 0, 'create', u.id, parsed.data);
+  await audit(u.id, 'request_create_anniversary', 'anniversary', 0, null, { approvalId: ap.id, ...parsed.data });
+  return NextResponse.json({
+    ok: true,
+    approvalId: ap.id,
+    message: 'The anniversary has been sent for approval. Another administrator must approve it.',
+  });
 }
+
+export const dynamic = 'force-dynamic';

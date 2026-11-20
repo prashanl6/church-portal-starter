@@ -2,10 +2,12 @@
 
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import useSWR from 'swr';
 import RichTextEditor from '@/components/RichTextEditor';
 import type { ProcessAudience } from '@/lib/processAudience';
+import { PageHeader, ADMIN_BACK, EmptyState, Alert, SkeletonList, StatusBadge, RowChevron, longDate } from '@/components/ui';
+import { IconBook, IconNotice, IconArrow } from '@/components/Icons';
+import Reveal from '@/components/Reveal';
 
 type Attachment = {
   id: number;
@@ -50,37 +52,53 @@ function AudienceRadios(props: {
 }) {
   const { value, onChange, name, disabled } = props;
   return (
-    <fieldset className="grid gap-2">
-      <legend className="label mb-0">Tag (required)</legend>
-      <p className="text-xs text-gray-600">
-        <strong>Public</strong> — listed for everyone, including without a login. <strong>Steward</strong> — listed only
-        for users who are logged in.
+    <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+      <legend className="label">Who can see this? (required)</legend>
+      <div className="segmented" role="radiogroup">
+        {(['public', 'steward'] as const).map((v) => (
+          <label
+            key={v}
+            className={value === v ? 'is-active' : ''}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              minHeight: 44,
+              padding: '0 1.1rem',
+              borderRadius: 12,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              fontWeight: 500,
+            }}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={v}
+              checked={value === v}
+              onChange={() => onChange(v)}
+              disabled={disabled}
+            />
+            {v === 'public' ? 'Public' : 'Steward'}
+          </label>
+        ))}
+      </div>
+      <p className="hint">
+        <strong>Public</strong>: everyone can see it, without logging in. <strong>Steward</strong>: only people who are
+        logged in can see it.
       </p>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input
-          type="radio"
-          name={name}
-          value="public"
-          checked={value === 'public'}
-          onChange={() => onChange('public')}
-          disabled={disabled}
-        />
-        Public
-      </label>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input
-          type="radio"
-          name={name}
-          value="steward"
-          checked={value === 'steward'}
-          onChange={() => onChange('steward')}
-          disabled={disabled}
-        />
-        Steward
-      </label>
     </fieldset>
   );
 }
+
+const fileIconStyle: React.CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: 12,
+  margin: 0,
+  background: 'var(--accent-soft)',
+  color: 'var(--accent)',
+  flexShrink: 0,
+};
 
 export default function AdminProcessesPage() {
   const { data, mutate, isLoading } = useSWR<{ list?: ProcessRow[] }>('/api/admin/processes', fetcher);
@@ -343,80 +361,85 @@ export default function AdminProcessesPage() {
     const deferPending = opts?.deferredRemovePendingIds ?? [];
     const useDeferredRemove = Boolean(opts?.onDeferRemove && opts?.onUndoDeferredRemove);
     return (
-      <div className="grid gap-2 mt-4">
-        <h3 className="text-sm font-semibold text-slate-800">Attached documents (Excel / Word)</h3>
-        <p className="text-xs text-gray-600">
-          .xls, .xlsx, .doc, .docx — up to 25MB each. Files open in a new tab when downloaded.
-        </p>
+      <div className="stack">
+        <div>
+          <h2 className="section-label" style={{ marginBottom: '0.3rem' }}>Attached documents (Excel / Word)</h2>
+          <p className="hint" style={{ marginTop: 0 }}>
+            .xls, .xlsx, .doc, .docx — up to 4 MB each. Files open in a new tab.
+          </p>
+        </div>
         {useDeferredRemove && (
-          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          <Alert tone="warning">
             Removing a file here takes effect only after this update is <strong>approved</strong>. Until then it stays on
             the live process.
-          </p>
+          </Alert>
         )}
         {attachments.length === 0 ? (
-          <p className="text-sm text-gray-500">No files attached yet.</p>
+          <p style={{ color: 'var(--text-3)', margin: 0 }}>No files attached yet.</p>
         ) : (
-          <ul className="text-sm space-y-2">
+          <div className="list-group">
             {attachments.map((a) => {
               const marked = deferPending.includes(a.id);
               return (
-                <li
+                <div
                   key={a.id}
-                  className={`flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded border border-slate-200 ${
-                    marked ? 'bg-amber-50 border-amber-200' : 'bg-slate-50'
-                  }`}
+                  className="list-row"
+                  style={{ cursor: 'default', flexWrap: 'wrap', background: marked ? '#fbf1e1' : undefined }}
                 >
-                  <a
-                    href={a.storedPath}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`text-blue-600 hover:underline font-medium ${marked ? 'line-through opacity-80' : ''}`}
-                  >
-                    {a.fileName}
-                  </a>
-                  <span className="text-xs text-gray-500">{formatBytes(a.byteSize)}</span>
+                  <span className="tile-icon" style={fileIconStyle}>
+                    <IconNotice size={22} />
+                  </span>
+                  <span className="list-row-main">
+                    <a
+                      href={a.storedPath}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="list-row-title"
+                      style={{ color: 'var(--accent)', textDecoration: marked ? 'line-through' : undefined }}
+                    >
+                      {a.fileName}
+                    </a>
+                    <span className="list-row-meta">
+                      {formatBytes(a.byteSize)}
+                      {marked && (
+                        <span className="badge badge-amber" style={{ marginLeft: formatBytes(a.byteSize) ? '0.5rem' : 0 }}>
+                          Pending removal
+                        </span>
+                      )}
+                    </span>
+                  </span>
                   {!readOnly && isAdmin && marked && useDeferredRemove && (
-                    <>
-                      <span className="text-xs text-amber-800">Pending removal</span>
-                      <button
-                        type="button"
-                        className="text-xs text-blue-700 hover:underline"
-                        onClick={() => opts?.onUndoDeferredRemove?.(a.id)}
-                      >
-                        Undo
-                      </button>
-                    </>
+                    <button type="button" className="btn-quiet" onClick={() => opts?.onUndoDeferredRemove?.(a.id)}>
+                      Undo
+                    </button>
                   )}
                   {!readOnly && isAdmin && !marked && useDeferredRemove && (
-                    <button
-                      type="button"
-                      className="text-xs text-red-700 hover:underline"
-                      onClick={() => opts?.onDeferRemove?.(a.id)}
-                    >
+                    <button type="button" className="btn-quiet danger" onClick={() => opts?.onDeferRemove?.(a.id)}>
                       Remove
                     </button>
                   )}
                   {!readOnly && isAdmin && !useDeferredRemove && (
                     <button
                       type="button"
-                      className="text-xs text-red-700 hover:underline"
+                      className="btn-quiet danger"
                       onClick={() => removeAttachment(processId, a.id)}
                     >
                       Remove
                     </button>
                   )}
-                </li>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
         {!readOnly && isAdmin && immediateUpload && (
           <div>
-            <label className="label">Add another file</label>
+            <label className="label" htmlFor={`add-file-${processId}`}>Add another file</label>
             <input
+              id={`add-file-${processId}`}
               type="file"
-              className="text-sm"
+              className="input"
+              style={{ paddingTop: '0.7rem' }}
               accept={FILE_INPUT_ACCEPT}
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -435,86 +458,129 @@ export default function AdminProcessesPage() {
     setPending: Dispatch<SetStateAction<File[]>>,
     id: string
   ) => (
-    <div className="grid gap-2">
-      <label className="label" htmlFor={id}>
-        Attach Excel / Word files (optional)
-      </label>
-      <p className="text-xs text-gray-600">
-        Select one or more files. They are saved when you submit this form (same step as the process).
-      </p>
-      <input
-        id={id}
-        type="file"
-        className="text-sm"
-        multiple
-        accept={FILE_INPUT_ACCEPT}
-        onChange={(e) => {
-          const next = Array.from(e.target.files || []);
-          e.target.value = '';
-          if (next.length) setPending((prev) => [...prev, ...next]);
-        }}
-      />
+    <div className="stack-sm">
+      <div>
+        <label className="label" htmlFor={id}>
+          Attach Excel / Word files (optional)
+        </label>
+        <input
+          id={id}
+          type="file"
+          className="input"
+          style={{ paddingTop: '0.7rem' }}
+          multiple
+          accept={FILE_INPUT_ACCEPT}
+          onChange={(e) => {
+            const next = Array.from(e.target.files || []);
+            e.target.value = '';
+            if (next.length) setPending((prev) => [...prev, ...next]);
+          }}
+        />
+        <p className="hint">
+          Choose one or more files, up to 4 MB each. They are saved when you submit this form.
+        </p>
+      </div>
       {pending.length > 0 && (
-        <ul className="text-sm space-y-1 border border-slate-200 rounded-md p-2 bg-slate-50">
+        <div className="list-group">
           {pending.map((f, i) => (
-            <li key={`${f.name}-${i}-${f.size}`} className="flex justify-between gap-2 items-center">
-              <span className="truncate">{f.name}</span>
+            <div key={`${f.name}-${i}-${f.size}`} className="list-row" style={{ cursor: 'default', minHeight: 56 }}>
+              <span className="list-row-main" style={{ overflow: 'hidden' }}>
+                <span className="list-row-title" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.name}
+                </span>
+                <span className="list-row-meta">Will upload when you submit</span>
+              </span>
               <button
                 type="button"
-                className="text-xs text-red-700 shrink-0 hover:underline"
+                className="btn-quiet danger"
                 onClick={() => setPending((prev) => prev.filter((_, j) => j !== i))}
               >
                 Remove
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
 
+  const BackButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
+    <button
+      type="button"
+      className="back-link"
+      onClick={onClick}
+      style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }}
+    >
+      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="m15 6-6 6 6 6" />
+      </svg>
+      {label}
+    </button>
+  );
+
+  const cancelEdit = () => {
+    setEditId(null);
+    setEditPendingFiles([]);
+    setEditPendingRemoveIds([]);
+    setScreen('list');
+  };
+
   if (screen === 'menu') {
     return (
-      <div className="grid gap-6 max-w-2xl">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <h1 className="text-2xl font-semibold">Process documents</h1>
-          <Link href="/admin" className="btn-secondary">
-            Back to admin
-          </Link>
-        </div>
-        <p className="text-sm text-gray-600">
-          Manage church process documents: view and edit existing processes, or add a new one. Attach Excel or Word
-          files to any process for download.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <button
-            type="button"
-            className="card text-left hover:border-blue-300 transition-colors border-2 border-transparent"
-            onClick={() => setScreen('list')}
-          >
-            <div className="text-lg font-semibold text-slate-900">1. View processes</div>
-            <p className="text-sm text-gray-600 mt-2">
-              Browse all processes, open the full document, download attachments, and edit (admin) from here.
-            </p>
-          </button>
-          <button
-            type="button"
-            className="card text-left hover:border-blue-300 transition-colors border-2 border-transparent"
-            onClick={() => {
-              if (!isAdmin) {
-                alert('Only administrators can add a new process.');
-                return;
-              }
-              setAddPendingFiles([]);
-              setScreen('add');
-            }}
-          >
-            <div className="text-lg font-semibold text-slate-900">2. Add process</div>
-            <p className="text-sm text-gray-600 mt-2">
-              Create a new process document and attach Excel/Word files on the same form before you submit.
-              {roleChecked && !isAdmin ? ' (Administrators only.)' : ''}
-            </p>
-          </button>
+      <div className="page">
+        <PageHeader
+          back={ADMIN_BACK}
+          title="Process documents"
+          subtitle="Guides and forms for church activities. New processes and changes go to a second administrator for approval before they are published."
+        />
+        <div className="tile-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(17rem, 1fr))' }}>
+          <Reveal>
+            <button
+              type="button"
+              className="feature-card"
+              style={{ width: '100%', height: '100%', textAlign: 'left', font: 'inherit', cursor: 'pointer', boxSizing: 'border-box' }}
+              onClick={() => setScreen('list')}
+            >
+              <span className="tile-icon" style={{ background: '#e7f1f3', color: '#3e7480' }}>
+                <IconBook />
+              </span>
+              <span className="tile-title">View processes</span>
+              <span className="tile-text">
+                Open any process, download its files, and edit or delete it.
+              </span>
+              <span className="tile-more">
+                Open <IconArrow size={20} />
+              </span>
+            </button>
+          </Reveal>
+          <Reveal delay={90}>
+            <button
+              type="button"
+              className="feature-card"
+              style={{ width: '100%', height: '100%', textAlign: 'left', font: 'inherit', cursor: 'pointer', boxSizing: 'border-box' }}
+              onClick={() => {
+                if (!isAdmin) {
+                  alert('Only administrators can add a new process.');
+                  return;
+                }
+                setAddPendingFiles([]);
+                setScreen('add');
+              }}
+            >
+              <span className="tile-icon" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+                <IconNotice />
+              </span>
+              <span className="tile-title">Add process</span>
+              <span className="tile-text">
+                Write a new process and attach Excel or Word files on the same form.
+                {roleChecked && !isAdmin ? ' (Administrators only.)' : ''}
+              </span>
+              <span className="tile-more">
+                Start <IconArrow size={20} />
+              </span>
+            </button>
+          </Reveal>
         </div>
       </div>
     );
@@ -522,49 +588,78 @@ export default function AdminProcessesPage() {
 
   if (screen === 'list') {
     return (
-      <div className="grid gap-4">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <button type="button" className="btn-secondary" onClick={() => setScreen('menu')}>
-            ← Main menu
-          </button>
-          <h1 className="text-2xl font-semibold">View processes</h1>
+      <div className="page">
+        <div>
+          <BackButton label="Process documents" onClick={() => setScreen('menu')} />
+          <PageHeader
+            title="View processes"
+            subtitle="Tap a process to read it. Edits and deletions need approval from a second administrator."
+            actions={
+              isAdmin ? (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setAddPendingFiles([]);
+                    setScreen('add');
+                  }}
+                >
+                  Add process
+                </button>
+              ) : undefined
+            }
+          />
         </div>
         {isLoading ? (
-          <p className="text-sm text-gray-500">Loading…</p>
+          <SkeletonList rows={4} />
         ) : list.length === 0 ? (
-          <div className="card text-gray-600 text-sm">No process documents yet. Use “Add process” to create one.</div>
+          <EmptyState icon={<IconBook />} title="No process documents yet" text="Use “Add process” to create one." />
         ) : (
-          <div className="grid gap-3">
+          <div className="list-group">
             {list.map((p) => (
-              <div key={p.id} className="card flex flex-wrap items-start justify-between gap-3">
-                <button type="button" className="text-left flex-1 min-w-[200px]" onClick={() => openDetail(p)}>
-                  <div className="font-semibold text-slate-900 flex flex-wrap items-center gap-2">
-                    {p.title}
-                    <span
-                      className={`text-xs font-medium px-2 py-0.5 rounded ${
-                        p.audience === 'steward' ? 'bg-violet-100 text-violet-900' : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {p.audience === 'steward' ? 'Steward' : 'Public'}
+              <div key={p.id} className="list-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => openDetail(p)}
+                  style={{
+                    flex: '1 1 16rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    minHeight: 56,
+                    background: 'none',
+                    border: 0,
+                    padding: 0,
+                    font: 'inherit',
+                    color: 'inherit',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span className="list-row-main">
+                    <span className="list-row-title">{p.title}</span>
+                    <span className="list-row-meta" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 0.6rem', marginTop: '0.35rem' }}>
+                      <span className={`badge ${p.audience === 'steward' ? 'badge-blue' : ''}`}>
+                        {p.audience === 'steward' ? 'Steward' : 'Public'}
+                      </span>
+                      <StatusBadge status={p.status} />
+                      <span>
+                        Version {p.version} · {p.attachments.length} file{p.attachments.length !== 1 ? 's' : ''}
+                      </span>
                     </span>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    v{p.version} · {p.status.replace(/_/g, ' ')} · {p.attachments.length} file
-                    {p.attachments.length !== 1 ? 's' : ''}
-                  </div>
+                  </span>
+                  <RowChevron />
                 </button>
-                <div className="flex gap-2">
-                  {isAdmin && (
-                    <>
-                      <button type="button" className="btn-secondary text-sm" onClick={() => startEdit(p)}>
-                        Edit
-                      </button>
-                      <button type="button" className="btn-delete text-sm" onClick={() => requestDelete(p)}>
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
+                {isAdmin && (
+                  <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                    <button type="button" className="btn-quiet" onClick={() => startEdit(p)}>
+                      Edit
+                    </button>
+                    <button type="button" className="btn-quiet danger" onClick={() => requestDelete(p)}>
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -575,17 +670,19 @@ export default function AdminProcessesPage() {
 
   if (screen === 'add') {
     return (
-      <div className="grid gap-4 max-w-3xl">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <button type="button" className="btn-secondary" onClick={() => setScreen('menu')}>
-            ← Main menu
-          </button>
-          <h1 className="text-2xl font-semibold">Add process</h1>
+      <div className="page panel-enter" style={{ maxWidth: '52rem' }}>
+        <div>
+          <BackButton label="Process documents" onClick={() => setScreen('menu')} />
+          <PageHeader
+            title="Add process"
+            subtitle="When you submit, a second administrator must approve it before it is published."
+          />
         </div>
-        <form onSubmit={submitAdd} className="card grid gap-4">
+        <form onSubmit={submitAdd} className="card form-grid">
           <div>
-            <label className="label">Title</label>
+            <label className="label" htmlFor="add-process-title">Title</label>
             <input
+              id="add-process-title"
               className="input"
               value={addForm.title}
               onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
@@ -609,10 +706,15 @@ export default function AdminProcessesPage() {
             />
           </div>
           {isAdmin && renderPendingFilesField(addPendingFiles, setAddPendingFiles, 'add-process-files')}
-          {!isAdmin && <p className="text-sm text-amber-800">Only administrators can create new processes.</p>}
-          <button className="btn w-fit" type="submit" disabled={addSubmitting || !isAdmin}>
-            {addSubmitting ? 'Submitting…' : 'Submit for approval'}
-          </button>
+          {!isAdmin && <Alert tone="warning">Only administrators can create new processes.</Alert>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <button className="btn" type="submit" disabled={addSubmitting || !isAdmin}>
+              {addSubmitting ? 'Submitting…' : 'Submit for approval'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => setScreen('menu')}>
+              Cancel
+            </button>
+          </div>
         </form>
       </div>
     );
@@ -621,26 +723,19 @@ export default function AdminProcessesPage() {
   if (screen === 'edit' && editId != null) {
     const row = list.find((x) => x.id === editId) ?? null;
     return (
-      <div className="grid gap-4 max-w-3xl">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => {
-              setEditId(null);
-              setEditPendingFiles([]);
-              setEditPendingRemoveIds([]);
-              setScreen('list');
-            }}
-          >
-            ← Back to list
-          </button>
-          <h1 className="text-2xl font-semibold">Edit process</h1>
+      <div className="page panel-enter" style={{ maxWidth: '52rem' }}>
+        <div>
+          <BackButton label="All processes" onClick={cancelEdit} />
+          <PageHeader
+            title="Edit process"
+            subtitle="Your changes go live only after a second administrator approves them."
+          />
         </div>
-        <form onSubmit={submitEdit} className="card grid gap-4">
+        <form onSubmit={submitEdit} className="card form-grid">
           <div>
-            <label className="label">Title</label>
+            <label className="label" htmlFor="edit-process-title">Title</label>
             <input
+              id="edit-process-title"
               className="input"
               value={editForm.title}
               onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
@@ -661,7 +756,7 @@ export default function AdminProcessesPage() {
             />
           </div>
           {row ? (
-            <>
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.5rem' }} className="stack">
               {renderAttachments(editId, row.attachments, !isAdmin, {
                 immediateUpload: false,
                 deferredRemovePendingIds: editPendingRemoveIds,
@@ -671,24 +766,15 @@ export default function AdminProcessesPage() {
                   setEditPendingRemoveIds((prev) => prev.filter((x) => x !== attId)),
               })}
               {isAdmin && renderPendingFilesField(editPendingFiles, setEditPendingFiles, 'edit-process-files')}
-            </>
+            </div>
           ) : (
-            <p className="text-sm text-gray-500">Loading files…</p>
+            <SkeletonList rows={2} height={56} />
           )}
-          <div className="flex gap-2">
-            <button className="btn w-fit" type="submit" disabled={editSubmitting}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <button className="btn" type="submit" disabled={editSubmitting}>
               {editSubmitting ? 'Submitting…' : 'Submit update for approval'}
             </button>
-            <button
-              type="button"
-              className="btn-secondary w-fit"
-              onClick={() => {
-                setEditId(null);
-                setEditPendingFiles([]);
-                setEditPendingRemoveIds([]);
-                setScreen('list');
-              }}
-            >
+            <button type="button" className="btn-secondary" onClick={cancelEdit}>
               Cancel
             </button>
           </div>
@@ -700,52 +786,51 @@ export default function AdminProcessesPage() {
   if (screen === 'detail' && selected) {
     const p = list.find((x) => x.id === selected.id) ?? selected;
     return (
-      <div className="grid gap-4 max-w-4xl">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button type="button" className="btn-secondary" onClick={() => setScreen('list')}>
-            ← Back to list
-          </button>
-          <div className="flex gap-2">
-            {isAdmin && (
-              <>
-                <button type="button" className="btn-secondary" onClick={() => startEdit(p)}>
-                  Edit
-                </button>
-                <button type="button" className="btn-delete" onClick={() => requestDelete(p)}>
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="card grid gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">{p.title}</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Tag: <strong className="text-slate-700">{p.audience === 'steward' ? 'Steward' : 'Public'}</strong> ·
-              Version {p.version} · {p.status.replace(/_/g, ' ')} · Updated{' '}
-              {new Date(p.updatedAt).toLocaleString()}
-            </p>
-          </div>
-          {renderAttachments(p.id, p.attachments, true)}
-          {isAdmin && (
-            <p className="text-xs text-gray-500 mt-2">
-              To add or remove files, click <strong>Edit</strong>.
-            </p>
-          )}
-          <article
-            className="notice-content prose max-w-none border-t border-slate-200 pt-4 mt-2"
-            dangerouslySetInnerHTML={{ __html: p.contentHtml }}
+      <div className="page panel-enter" style={{ maxWidth: '58rem' }}>
+        <div>
+          <BackButton label="All processes" onClick={() => setScreen('list')} />
+          <PageHeader
+            title={p.title}
+            subtitle={
+              <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem 0.75rem' }}>
+                <span className={`badge ${p.audience === 'steward' ? 'badge-blue' : ''}`}>
+                  {p.audience === 'steward' ? 'Steward' : 'Public'}
+                </span>
+                <StatusBadge status={p.status} />
+                <span>Version {p.version} · Updated {longDate(p.updatedAt)}</span>
+              </span>
+            }
+            actions={
+              isAdmin ? (
+                <>
+                  <button type="button" className="btn-secondary" onClick={() => startEdit(p)}>
+                    Edit
+                  </button>
+                  <button type="button" className="btn btn-delete" onClick={() => requestDelete(p)}>
+                    Delete
+                  </button>
+                </>
+              ) : undefined
+            }
           />
         </div>
+        <article className="card notice-content" dangerouslySetInnerHTML={{ __html: p.contentHtml }} />
+        <section className="card">
+          {renderAttachments(p.id, p.attachments, true)}
+          {isAdmin && (
+            <p className="hint" style={{ marginTop: '1rem' }}>
+              To add or remove files, choose <strong>Edit</strong>.
+            </p>
+          )}
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-4 max-w-lg">
-      <p className="text-sm text-gray-600">Select an option to continue.</p>
-      <button type="button" className="btn-secondary w-fit" onClick={() => setScreen('menu')}>
+    <div className="page" style={{ maxWidth: '32rem' }}>
+      <p style={{ color: 'var(--text-2)', margin: 0 }}>Select an option to continue.</p>
+      <button type="button" className="btn-secondary" style={{ width: 'fit-content' }} onClick={() => setScreen('menu')}>
         Main menu
       </button>
     </div>

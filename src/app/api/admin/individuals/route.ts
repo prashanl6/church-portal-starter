@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
+import { requireRole, guardAdmin } from '@/lib/auth';
+import { submitApproval } from '@/lib/approval';
+import { audit } from '@/lib/audit';
+import { individualCreateSchema, firstIssue } from '@/lib/validate';
 import { isOccasionInNextNDays, occasionMatchesAnyDayInRange } from '@/lib/peopleUpcoming';
 
 const PAGE_SIZE_DEFAULT = 25;
@@ -116,33 +119,21 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const u = requireRole(['admin', 'staff']);
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const u = g.user;
 
-  try {
-    const body = await req.json();
-    const { displayName, birthDate, email, phone, notes } = body;
+  const parsed = individualCreateSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
 
-    if (!displayName || !birthDate) {
-      return NextResponse.json({ error: 'Display name and date of birth are required' }, { status: 400 });
-    }
-
-    const created = await prisma.churchIndividual.create({
-      data: {
-        displayName: String(displayName),
-        birthDate: new Date(birthDate),
-        email: email || null,
-        phone: phone || null,
-        notes: notes || null,
-        status: 'active'
-      }
-    });
-
-    return NextResponse.json({ ok: true, id: created.id });
-  } catch (error: unknown) {
-    console.error('Error in POST /api/admin/individuals:', error);
-    return NextResponse.json({ error: 'Failed to create individual' }, { status: 500 });
-  }
+  // Nothing is added to the register until a different admin approves.
+  const ap = await submitApproval('individual', 0, 'create', u.id, parsed.data);
+  await audit(u.id, 'request_create_individual', 'individual', 0, null, { approvalId: ap.id, ...parsed.data });
+  return NextResponse.json({
+    ok: true,
+    approvalId: ap.id,
+    message: `${parsed.data.displayName} has been sent for approval. Another administrator must approve before they appear in the register.`,
+  });
 }
+
+export const dynamic = 'force-dynamic';

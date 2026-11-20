@@ -1,5 +1,9 @@
-/** Bank and branch: letters and spaces only (no digits or punctuation). */
-const LETTERS_AND_SPACES_ONLY = /^[A-Za-z ]+$/;
+/**
+ * Bank and branch names: letters, numbers, spaces and simple punctuation, because real
+ * names look like "Colombo 03" or "St. Mark's Road". Must contain at least one letter.
+ */
+const NAME_CHARS = /^[A-Za-z0-9 .,'&()\/-]+$/;
+const validName = (v: string) => NAME_CHARS.test(v) && /[A-Za-z]/.test(v);
 
 export type ChurchBankAccountPayload = {
   accountNumber: string;
@@ -23,8 +27,8 @@ export function parseChurchBankAccountPayload(body: unknown):
   if (!accountNumber) {
     return { ok: false, error: 'Account number is required' };
   }
-  if (!/^\d+$/.test(accountNumber)) {
-    return { ok: false, error: 'Account number may contain digits only' };
+  if (!/^\d{4,30}$/.test(accountNumber)) {
+    return { ok: false, error: 'Account number may contain digits only (no spaces or dashes)' };
   }
   if (!accountName || accountName.length > 200) {
     return { ok: false, error: 'Account name is required (max 200 characters)' };
@@ -32,14 +36,14 @@ export function parseChurchBankAccountPayload(body: unknown):
   if (!bankName) {
     return { ok: false, error: 'Bank is required' };
   }
-  if (!LETTERS_AND_SPACES_ONLY.test(bankName) || !bankName.replace(/\s/g, '').length) {
-    return { ok: false, error: 'Bank must use letters and spaces only' };
+  if (!validName(bankName) || bankName.length > 120) {
+    return { ok: false, error: 'Bank name can use letters, numbers, spaces and . , \' & ( ) / - only' };
   }
   if (!branch) {
     return { ok: false, error: 'Branch is required' };
   }
-  if (!LETTERS_AND_SPACES_ONLY.test(branch) || !branch.replace(/\s/g, '').length) {
-    return { ok: false, error: 'Branch must use letters and spaces only' };
+  if (!validName(branch) || branch.length > 120) {
+    return { ok: false, error: 'Branch can use letters, numbers, spaces and . , \' & ( ) / - only' };
   }
 
   return { ok: true, data: { accountNumber, accountName, bankName, branch } };

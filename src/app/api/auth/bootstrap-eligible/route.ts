@@ -11,6 +11,6 @@ export async function GET() {
   if (!secret) {
     return NextResponse.json({ eligible: false });
   }
-  const count = await prisma.user.count();
+  const count = await prisma.user.count({ where: { role: 'admin' } });
   return NextResponse.json({ eligible: count === 0 });
 }

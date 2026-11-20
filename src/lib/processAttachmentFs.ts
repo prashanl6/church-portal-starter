@@ -1,9 +1,13 @@
 import { join } from 'path';
-import { mkdir, writeFile, unlink } from 'fs/promises';
-import { existsSync } from 'fs';
+import { unlink } from 'fs/promises';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { deleteStoredFiles, saveStoredFile, storedFileUrl } from '@/lib/storedFiles';
 
-const MAX_BYTES = 25 * 1024 * 1024;
+type Db = PrismaClient | Prisma.TransactionClient;
+
+// Vercel rejects request bodies over 4.5 MB, so keep uploads under that.
+const MAX_BYTES = 4 * 1024 * 1024;
 
 /** MIME types browsers send for Excel / Word uploads. */
 export const PROCESS_DOC_ALLOWED_MIMES = new Set([
@@ -17,83 +21,58 @@ function extensionAllowed(name: string): boolean {
   return /\.(xlsx|xls|docx|doc)$/i.test(name);
 }
 
-function mimeOrExtensionOk(file: File, originalName: string): boolean {
-  if (file.type && PROCESS_DOC_ALLOWED_MIMES.has(file.type)) return true;
-  return extensionAllowed(originalName);
+function mimeFromName(originalName: string): string {
+  if (/\.xlsx$/i.test(originalName)) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (/\.xls$/i.test(originalName)) return 'application/vnd.ms-excel';
+  if (/\.docx$/i.test(originalName)) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  return 'application/msword';
 }
 
-function safeSegment(name: string): string {
-  const base = name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
-  return base || 'file';
-}
-
+/** Validate and store an Excel/Word file in the database. Returns the attachment fields. */
 export async function saveProcessAttachmentFile(
-  processDocId: number,
+  _processDocId: number,
   originalName: string,
   file: File
-): Promise<{ storedPath: string; mimeType: string; byteSize: number }> {
+): Promise<{ storedPath: string; mimeType: string; byteSize: number; fileId: number }> {
   if (file.size > MAX_BYTES) {
-    throw new Error('File too large (maximum 25MB)');
+    throw new Error('This file is too large. The maximum size is 4 MB.');
   }
-  if (!mimeOrExtensionOk(file, originalName)) {
-    throw new Error('Only Excel (.xls, .xlsx) and Word (.doc, .docx) files are allowed');
+  // Require the extension to match even when the browser sends a valid MIME type.
+  if (!extensionAllowed(originalName)) {
+    throw new Error('Only Excel (.xls, .xlsx) and Word (.doc, .docx) files can be attached.');
   }
-
-  const mimeType =
-    file.type && PROCESS_DOC_ALLOWED_MIMES.has(file.type)
-      ? file.type
-      : /\.xlsx?$/i.test(originalName)
-        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : /\.xls$/i.test(originalName)
-          ? 'application/vnd.ms-excel'
-          : /\.docx$/i.test(originalName)
-            ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            : 'application/msword';
-
-  const uploadsDir = join(process.cwd(), 'public', 'uploads', 'processes', String(processDocId));
-  if (!existsSync(uploadsDir)) {
-    await mkdir(uploadsDir, { recursive: true });
-  }
-
-  const stamp = Date.now();
-  const safe = safeSegment(originalName);
-  const diskName = `${stamp}-${safe}`;
-  const absPath = join(uploadsDir, diskName);
-  const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(absPath, bytes);
-
-  const storedPath = `/uploads/processes/${processDocId}/${diskName}`;
-  return { storedPath, mimeType, byteSize: bytes.length };
+  const mimeType = mimeFromName(originalName);
+  const { id, byteSize } = await saveStoredFile('process_attachment', file, originalName, mimeType);
+  return { storedPath: storedFileUrl(id), mimeType, byteSize, fileId: id };
 }
 
-export async function unlinkProcessAttachmentFiles(processDocId: number): Promise<void> {
-  const rows = await prisma.processAttachment.findMany({ where: { processDocId } });
-  for (const r of rows) {
-    const rel = r.storedPath.replace(/^\//, '');
-    const abs = join(process.cwd(), 'public', rel);
-    try {
-      await unlink(abs);
-    } catch {
-      /* ignore missing file */
-    }
+async function unlinkLegacy(storedPath: string) {
+  if (!storedPath.startsWith('/uploads/')) return;
+  try {
+    await unlink(join(process.cwd(), 'public', storedPath.replace(/^\//, '')));
+  } catch {
+    /* ignore missing file */
   }
 }
 
-/** Delete specific attachments that belong to this process (DB row + file on disk). */
-export async function deleteProcessAttachmentsByIds(processDocId: number, ids: number[]): Promise<void> {
+/** Remove every attachment's stored bytes for a process (rows cascade when the process is deleted). */
+export async function unlinkProcessAttachmentFiles(processDocId: number, db: Db = prisma): Promise<void> {
+  const rows = await db.processAttachment.findMany({ where: { processDocId } });
+  await deleteStoredFiles(rows.map((r) => r.fileId), db);
+  for (const r of rows) await unlinkLegacy(r.storedPath);
+}
+
+/** Delete specific attachments that belong to this process (row + stored bytes). */
+export async function deleteProcessAttachmentsByIds(
+  processDocId: number,
+  ids: number[],
+  db: Db = prisma
+): Promise<void> {
   const unique = [...new Set(ids.filter((n) => Number.isFinite(n) && n > 0))];
   if (!unique.length) return;
-  for (const attId of unique) {
-    const att = await prisma.processAttachment.findFirst({
-      where: { id: attId, processDocId },
-    });
-    if (!att) continue;
-    await prisma.processAttachment.delete({ where: { id: att.id } });
-    const rel = att.storedPath.replace(/^\//, '');
-    try {
-      await unlink(join(process.cwd(), 'public', rel));
-    } catch {
-      /* ignore missing file */
-    }
-  }
+  const rows = await db.processAttachment.findMany({ where: { processDocId, id: { in: unique } } });
+  if (!rows.length) return;
+  await db.processAttachment.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  await deleteStoredFiles(rows.map((r) => r.fileId), db);
+  for (const r of rows) await unlinkLegacy(r.storedPath);
 }
