@@ -24,6 +24,19 @@ function resolveDatabaseUrl(env = process.env) {
   return (key && env[key]) || env.DATABASE_URL;
 }
 
+/**
+ * Direct (non-pooled) connection for migrations, which should not go through a connection
+ * pooler. Falls back to the normal one.
+ * @param {Record<string, string | undefined>} [env]
+ */
+function resolveDirectDatabaseUrl(env = process.env) {
+  if (env.CHURCH_DATABASE_URL) return env.CHURCH_DATABASE_URL;
+  const key = Object.keys(env)
+    .sort()
+    .find((k) => /^([A-Z0-9]+_)?(DATABASE_URL_UNPOOLED|POSTGRES_URL_NON_POOLING)$/.test(k) && env[k]);
+  return (key && env[key]) || resolveDatabaseUrl(env);
+}
+
 /** Name of the variable in use, for logs (never the value). */
 function databaseUrlSource(env = process.env) {
   if (env.CHURCH_DATABASE_URL) return 'CHURCH_DATABASE_URL';
@@ -31,4 +44,4 @@ function databaseUrlSource(env = process.env) {
   return Object.keys(env).find((k) => env[k] === url && k !== 'DATABASE_URL') || 'DATABASE_URL';
 }
 
-module.exports = { resolveDatabaseUrl, databaseUrlSource };
+module.exports = { resolveDatabaseUrl, resolveDirectDatabaseUrl, databaseUrlSource };

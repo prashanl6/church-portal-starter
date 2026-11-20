@@ -11,7 +11,7 @@
  * Set SKIP_DB_MIGRATIONS=1 to skip them anywhere.
  */
 const { execSync } = require('child_process');
-const { resolveDatabaseUrl, databaseUrlSource } = require('../src/lib/databaseUrl.js');
+const { resolveDatabaseUrl, resolveDirectDatabaseUrl, databaseUrlSource } = require('../src/lib/databaseUrl.js');
 
 // Use the same database the app will use (e.g. one connected via Vercel → Storage).
 // Every command below inherits this, including Prisma migrations and the seed scripts.
@@ -55,7 +55,10 @@ if (skipMigrations) {
       'Only production builds change the database.'
   );
 } else {
-  runWithRetry('npx prisma migrate deploy');
+  // Migrations use the direct (non-pooled) connection.
+  const direct = resolveDirectDatabaseUrl();
+  if (direct) process.env.MIGRATE_URL = direct;
+  runWithRetry(direct ? 'DATABASE_URL="$MIGRATE_URL" npx prisma migrate deploy' : 'npx prisma migrate deploy');
 }
 
 run('npx prisma generate');
