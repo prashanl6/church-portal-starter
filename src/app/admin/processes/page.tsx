@@ -346,7 +346,7 @@ export default function AdminProcessesPage() {
       <div className="grid gap-2 mt-4">
         <h3 className="text-sm font-semibold text-slate-800">Attached documents (Excel / Word)</h3>
         <p className="text-xs text-gray-600">
-          .xls, .xlsx, .doc, .docx — up to 25MB each. Files open in a new tab when downloaded.
+          .xls, .xlsx, .doc, .docx — up to 4 MB each. Files open in a new tab when downloaded.
         </p>
         {useDeferredRemove && (
           <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">

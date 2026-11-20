@@ -4,6 +4,18 @@ import { useEffect, useState } from 'react';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+/** Show the server's plain-English message (or a fallback) after a save. */
+async function showResult(res: Response, fallbackOk: string, fallbackErr: string): Promise<boolean> {
+  const body = await res.json().catch(() => ({} as any));
+  if (res.status === 401) {
+    alert('Your session has expired. Please log in again.');
+    window.location.href = '/login';
+    return false;
+  }
+  alert(res.ok ? body.message || fallbackOk : body.error || fallbackErr);
+  return res.ok;
+}
+
 /** Active-only select list may omit partners on inactive anniversaries; merge so dropdowns stay valid. */
 function selectOptionsWithIndividuals(
   base: { id: number; displayName: string }[],
@@ -146,17 +158,9 @@ export default function PeopleEventsPage() {
         notes: birthdayForm.notes || null
       })
     });
-    if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
-      return;
-    }
-    if (res.ok) {
-      alert('Individual added');
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setBirthdayForm({ displayName: '', birthDate: '', email: '', phone: '', notes: '' });
       await refreshBirthdays();
-    } else {
-      alert((await res.text()) || 'Failed to create');
     }
   };
 
@@ -176,17 +180,9 @@ export default function PeopleEventsPage() {
         notes: anniversaryForm.notes || null
       })
     });
-    if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
-      return;
-    }
-    if (res.ok) {
-      alert('Anniversary added');
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setAnniversaryForm({ individualAId: '', individualBId: '', anniversaryDate: '', notes: '' });
       await refreshAnniversaries();
-    } else {
-      alert((await res.text()) || 'Failed to create');
     }
   };
 
@@ -196,8 +192,7 @@ export default function PeopleEventsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: currentStatus === 'active' ? 'inactive' : 'active' })
     });
-    if (res.ok) await refreshBirthdays();
-    else alert('Failed to update status');
+    if (await showResult(res, 'Sent for approval.', 'Could not change the status.')) await refreshBirthdays();
   };
 
   const toggleAnniversaryStatus = async (id: number, currentStatus: string) => {
@@ -206,8 +201,7 @@ export default function PeopleEventsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: currentStatus === 'active' ? 'inactive' : 'active' })
     });
-    if (res.ok) await refreshAnniversaries();
-    else alert('Failed to update status');
+    if (await showResult(res, 'Sent for approval.', 'Could not change the status.')) await refreshAnniversaries();
   };
 
   const saveDateOfDeath = async (id: number) => {
@@ -219,15 +213,10 @@ export default function PeopleEventsPage() {
         dateOfDeath: raw ? new Date(raw).toISOString() : null
       })
     });
-    if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
-      return;
-    }
-    if (res.ok) {
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setExpandedIndividualId(null);
       await refreshBirthdays();
-    } else alert((await res.text()) || 'Failed to save');
+    }
   };
 
   const openIndividualDetails = (row: { id: number; dateOfDeath?: string | null }) => {
@@ -261,11 +250,11 @@ export default function PeopleEventsPage() {
         individualBId: Number(anniversaryDraft.individualBId)
       })
     });
-    if (res.ok) {
+    if (await showResult(res, 'Sent for approval.', 'Could not save.')) {
       setExpandedAnniversaryId(null);
       setAnniversaryDraft(null);
       await refreshAnniversaries();
-    } else alert((await res.text()) || 'Failed to save');
+    }
   };
 
   const loadBirthdayRange = () => {

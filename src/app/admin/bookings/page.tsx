@@ -133,7 +133,7 @@ function AdminBookingsPageContent() {
                   return;
                 }
                 await mutateHallSettings();
-                alert('Hall hire rate saved');
+                alert(data.message || 'Sent for approval');
               } finally {
                 setRateSaving(false);
               }

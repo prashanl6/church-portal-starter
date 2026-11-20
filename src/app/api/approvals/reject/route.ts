@@ -1,24 +1,22 @@
 import { NextResponse } from 'next/server';
-import { reject } from '@/lib/approval';
-import { getUserFromCookie } from '@/lib/auth';
+import { reject, ApprovalError } from '@/lib/approval';
+import { guardAdmin } from '@/lib/auth';
 
 export async function POST(req: Request) {
-  const { resourceType, resourceId, comment } = await req.json();
-  const u = getUserFromCookie();
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
-  
-  // For bookings, comment is mandatory
-  if (resourceType === 'booking' && (!comment || comment.trim() === '')) {
-    return NextResponse.json({ error: 'Rejection reason is required for booking rejections' }, { status: 400 });
-  }
-  
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const body = await req.json().catch(() => ({}));
+  const approvalId = Number(body?.approvalId);
   try {
-    const result = await reject(resourceType, Number(resourceId), u.id, comment || '');
+    const result = Number.isInteger(approvalId) && approvalId > 0
+      ? await reject({ approvalId }, g.user.id, String(body?.comment ?? ''))
+      : await reject({ resourceType: String(body?.resourceType), resourceId: Number(body?.resourceId) }, g.user.id, String(body?.comment ?? ''));
     return NextResponse.json({ ok: true, result });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message }, { status: 400 });
+  } catch (e: any) {
+    const status = e instanceof ApprovalError ? e.status : 500;
+    if (status === 500) console.error('reject failed', e);
+    return NextResponse.json({ error: status === 500 ? 'Something went wrong. Nothing was changed.' : e.message }, { status });
   }
 }
 
+export const dynamic = 'force-dynamic';

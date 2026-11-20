@@ -1,8 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { saveStoredFile, deleteStoredFiles } from '@/lib/storedFiles';
 import { submitApproval, getOrCreateSystemUser } from '@/lib/approval';
 
 export async function POST(req: Request, { params }: { params: { bookingRef: string } }) {
@@ -37,39 +35,36 @@ export async function POST(req: Request, { params }: { params: { bookingRef: str
       return NextResponse.json({ error: 'Invalid file type. Only images (JPG, PNG) and PDF are allowed' }, { status: 400 });
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // Validate file size (max 4 MB)
+    const maxSize = 4 * 1024 * 1024; // Vercel rejects bodies over 4.5 MB
     if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 });
+      return NextResponse.json({ error: 'This file is too large. Please upload a photo or PDF under 4 MB.' }, { status: 400 });
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'receipts');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
+    // Check the file really is an image/PDF by its first bytes, not just what the browser says.
+    const head = Buffer.from(await file.slice(0, 8).arrayBuffer());
+    const isPdf = head.subarray(0, 4).toString('latin1') === '%PDF';
+    const isPng = head[0] === 0x89 && head.subarray(1, 4).toString('latin1') === 'PNG';
+    const isJpg = head[0] === 0xff && head[1] === 0xd8;
+    if (!isPdf && !isPng && !isJpg) {
+      return NextResponse.json({ error: 'Please upload a photo (JPG or PNG) or a PDF of the payment slip.' }, { status: 400 });
     }
+    const mimeType = isPdf ? 'application/pdf' : isPng ? 'image/png' : 'image/jpeg';
+    const ext = isPdf ? 'pdf' : isPng ? 'png' : 'jpg';
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${booking.bookingRef}-${timestamp}.${fileExtension}`;
-    const filePath = join(uploadsDir, fileName);
-
-    // Save file
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
-
-    // Update booking with payment details
-    const slipUrl = `/uploads/receipts/${fileName}`;
+    // Stored in the database (not on the web server's disk, which is wiped on Vercel and was public).
+    const saved = await saveStoredFile('booking_slip', file, `${booking.bookingRef}-payment-slip.${ext}`, mimeType);
     await prisma.booking.update({
       where: { id: booking.id },
       data: {
-        paymentRef: paymentRef.trim(),
-        slipUrl,
+        paymentRef: paymentRef.trim().slice(0, 100),
+        slipFileId: saved.id,
+        slipUrl: null,
         status: 'APPROVED_PENDING_PAYMENT', // Still pending admin confirmation
       },
     });
+    // Replace an earlier slip for this booking, if any.
+    if (booking.slipFileId) await deleteStoredFiles([booking.slipFileId]);
 
     // Create approval record for payment confirmation
     try {
@@ -95,7 +90,6 @@ export async function POST(req: Request, { params }: { params: { bookingRef: str
     return NextResponse.json({ 
       ok: true, 
       message: 'Receipt uploaded successfully. Waiting for admin confirmation.',
-      slipUrl 
     });
   } catch (error: any) {
     console.error('Error uploading payment receipt:', error);
@@ -103,3 +97,5 @@ export async function POST(req: Request, { params }: { params: { bookingRef: str
   }
 }
 
+
+export const dynamic = 'force-dynamic';

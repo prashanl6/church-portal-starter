@@ -12,9 +12,21 @@ export async function GET(req: Request, { params }: { params: { bookingRef: stri
     }
 
     return NextResponse.json({
+      // Only what the person who booked needs to see. No internal ids or file links.
       booking: {
-        ...booking,
+        bookingRef: booking.bookingRef,
+        hall: booking.hall,
         date: booking.date.toISOString(),
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        purpose: booking.purpose,
+        requesterName: booking.requesterName,
+        email: booking.email,
+        phone: booking.phone,
+        status: booking.status,
+        amount: booking.amount,
+        paymentRef: booking.paymentRef,
+        slipReceived: !!(booking.slipFileId || booking.slipUrl),
       },
     });
   } catch (error) {
@@ -23,3 +35,5 @@ export async function GET(req: Request, { params }: { params: { bookingRef: stri
   }
 }
 
+
+export const dynamic = 'force-dynamic';

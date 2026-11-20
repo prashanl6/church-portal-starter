@@ -1,14 +1,15 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { HALL_HOLDING_STATUSES } from '@/lib/bookingClash';
 
 export async function GET() {
-  const now = new Date();
-  // Only show future bookings that are fully paid and approved
-  const booked = await prisma.booking.findMany({ 
-    where: { 
-      status: 'BOOKED_PAID',
-      date: { gte: now } // Only future dates
-    }, 
+  const today = new Date(new Date().toISOString().slice(0, 10));
+  // Show approved (waiting for payment) and paid bookings from today onwards: both hold the hall.
+  const booked = await prisma.booking.findMany({
+    where: {
+      status: { in: HALL_HOLDING_STATUSES },
+      date: { gte: today },
+    },
     select: { 
       date: true, 
       startTime: true, 
@@ -18,3 +19,5 @@ export async function GET() {
   });
   return NextResponse.json({ booked });
 }
+
+export const dynamic = 'force-dynamic';

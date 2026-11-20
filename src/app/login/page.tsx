@@ -47,12 +47,8 @@ export default function LoginPage() {
       setMsg('Logged in. Go to Admin → Approvals.');
       window.location.href = '/admin';
     } else {
-      setMsg('Invalid email or password.');
-      setMsgDetail(
-        'Demo accounts (e.g. admin1@example.com) only exist if this database was seeded. ' +
-          'A fresh Vercel deploy usually has no users — use First-time setup below (if shown), run `npx prisma db seed` ' +
-          'with your production DATABASE_URL, or see HOSTING_AND_OPERATIONS.md.'
-      );
+      const data = await res.json().catch(() => ({}));
+      setMsg(typeof data.message === 'string' ? data.message : 'The email or password is not correct. Please try again.');
     }
   };
 

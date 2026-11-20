@@ -46,3 +46,5 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 }
 
+
+export const dynamic = 'force-dynamic';

@@ -16,7 +16,7 @@ interface Booking {
   status: string;
   amount: number | null;
   paymentRef: string | null;
-  slipUrl: string | null;
+  slipReceived: boolean;
 }
 
 export default function BookingDetailsPage() {
@@ -199,12 +199,9 @@ export default function BookingDetailsPage() {
                 <strong>Payment Reference:</strong> {booking.paymentRef}
               </div>
             )}
-            {booking.slipUrl && (
+            {booking.slipReceived && (
               <div>
-                <strong>Receipt:</strong>{' '}
-                <a href={booking.slipUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'rgb(37, 99, 235)' }}>
-                  View Receipt
-                </a>
+                <strong>Payment slip:</strong> Received ✓ — the church office will check it and email you.
               </div>
             )}
           </div>

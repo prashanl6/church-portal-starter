@@ -2,8 +2,8 @@ import { test, expect, request } from '@playwright/test';
 
 // End-to-end test that mirrors the shell e2e script:
 // 1. Login admin1, create a notice (status: submitted)
-// 2. Login admin2, approve (approver1)
-// 3. Login staff, approve (approver2)
+// 2. Login admin2 (the checker), approve -> published
+// 3. Staff cannot approve
 // 4. Fetch /api/notices and assert the notice is published
 
 const ADMIN1 = { email: 'admin1@example.com', password: 'Admin@123' };
@@ -48,7 +48,7 @@ test('notice publish workflow (API)', async () => {
   expect(createBody.id).toBeTruthy();
   const id = Number(createBody.id);
 
-  // 3. login admin2 and approve (approver1)
+  // 3. login admin2 (a different admin) and approve: this publishes it
   const cookieAdmin2 = await loginGetCookie(ADMIN2.email, ADMIN2.password);
   const approve1 = await api.post('/api/approvals/approve', {
     data: { resourceType: 'notice', resourceId: id, comment: 'approver1 ok' },
@@ -58,15 +58,13 @@ test('notice publish workflow (API)', async () => {
   const a1 = await approve1.json();
   expect(a1.ok).toBeTruthy();
 
-  // 4. login staff and approve (approver2)
+  // 4. staff must NOT be able to approve (maker + admin checker rule)
   const cookieStaff = await loginGetCookie(STAFF.email, STAFF.password);
-  const approve2 = await api.post('/api/approvals/approve', {
-    data: { resourceType: 'notice', resourceId: id, comment: 'approver2 ok' },
+  const staffTry = await api.post('/api/approvals/approve', {
+    data: { resourceType: 'notice', resourceId: id, comment: 'staff should be refused' },
     headers: { cookie: cookieStaff }
   });
-  expect(approve2.ok()).toBeTruthy();
-  const a2 = await approve2.json();
-  expect(a2.ok).toBeTruthy();
+  expect(staffTry.status()).toBe(403);
 
   // 5. fetch notices and ensure our notice is published
   const noticesResp = await api.get('/api/notices');

@@ -1,9 +1,21 @@
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 import { prisma } from './prisma';
 import bcrypt from 'bcryptjs';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+/**
+ * JWT signing secret. In production a real secret is mandatory: with the old "dev-secret"
+ * fallback anyone could forge an admin login.
+ */
+export function getJwtSecret(): string {
+  const s = process.env.JWT_SECRET;
+  if (s && s.length >= 16 && s !== 'your-secret-key-here') return s;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set to a long random value in production.');
+  }
+  return 'dev-secret-only-for-local-development';
+}
 
 export const AUTH_COOKIE_NAME = 'token';
 
@@ -25,35 +37,93 @@ export function getAuthCookieOptions(): {
   };
 }
 
-export async function login(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return null;
-  const token = jwt.sign({ sub: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
-  return token;
+let _dummy: string | null = null;
+function dummyHash() {
+  return (_dummy ??= bcrypt.hashSync('not-a-real-password', 10));
 }
 
-export function getUserFromCookie(): { id: number, role: string, email: string } | null {
+const MAX_FAILED_LOGINS = 5;
+const LOCK_MINUTES = 15;
+
+export type LoginResult =
+  | { ok: true; token: string }
+  | { ok: false; reason: 'invalid' | 'locked'; minutes?: number };
+
+export async function login(emailRaw: string, password: string): Promise<LoginResult> {
+  const email = String(emailRaw || '').trim().toLowerCase();
+  if (!email || !password) return { ok: false, reason: 'invalid' };
+  const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
+  // Only active admin/staff accounts can log in (never the internal system user).
+  if (!user || user.status !== 'active' || (user.role !== 'admin' && user.role !== 'staff')) {
+    await bcrypt.compare(password, dummyHash()); // even out timing so emails can't be probed
+    return { ok: false, reason: 'invalid' };
+  }
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    return { ok: false, reason: 'locked', minutes: Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000) };
+  }
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) {
+    const failed = user.failedLoginCount + 1;
+    const lock = failed >= MAX_FAILED_LOGINS;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginCount: lock ? 0 : failed,
+        lockedUntil: lock ? new Date(Date.now() + LOCK_MINUTES * 60000) : null,
+      },
+    });
+    return lock ? { ok: false, reason: 'locked', minutes: LOCK_MINUTES } : { ok: false, reason: 'invalid' };
+  }
+  if (user.failedLoginCount || user.lockedUntil) {
+    await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null } });
+  }
+  const token = jwt.sign({ sub: user.id, role: user.role, email: user.email }, getJwtSecret(), { expiresIn: '8h' });
+  return { ok: true, token };
+}
+
+export function getUserFromCookie(): { id: number; role: string; email: string } | null {
   try {
-    const cookieStore = cookies();
-    const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    const token = cookies().get(AUTH_COOKIE_NAME)?.value;
     if (!token) return null;
-    try {
-      const payload = jwt.verify(token, JWT_SECRET) as any;
-      return { id: Number(payload.sub), role: payload.role, email: payload.email };
-    } catch (err) {
-      // Token expired or invalid
-      return null;
-    }
-  } catch (err) {
-    // Error reading cookies
+    const payload = jwt.verify(token, getJwtSecret()) as any;
+    return { id: Number(payload.sub), role: payload.role, email: payload.email };
+  } catch {
+    // Missing, expired or invalid token
     return null;
   }
 }
 
-export function requireRole(roles: Array<'admin'|'staff'>) {
+export function requireRole(roles: Array<'admin' | 'staff'>) {
   const u = getUserFromCookie();
   if (!u || !roles.includes(u.role as any)) return null;
   return u;
+}
+
+/**
+ * For write routes: returns the logged-in admin, or a ready-made error response.
+ * Usage: const g = guardAdmin(); if ('response' in g) return g.response; const u = g.user;
+ */
+export function guardAdmin():
+  | { user: { id: number; role: string; email: string } }
+  | { response: NextResponse } {
+  const u = getUserFromCookie();
+  if (!u) return { response: NextResponse.json({ error: 'Please log in to continue.' }, { status: 401 }) };
+  if (u.role !== 'admin') {
+    return {
+      response: NextResponse.json(
+        { error: 'Only administrators can make changes. Staff accounts can view only.' },
+        { status: 403 }
+      ),
+    };
+  }
+  return { user: u };
+}
+
+/** For read routes used by admins and staff. */
+export function guardStaffOrAdmin():
+  | { user: { id: number; role: string; email: string } }
+  | { response: NextResponse } {
+  const u = requireRole(['admin', 'staff']);
+  if (!u) return { response: NextResponse.json({ error: 'Please log in to continue.' }, { status: 401 }) };
+  return { user: u };
 }

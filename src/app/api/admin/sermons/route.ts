@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
+import { audit } from '@/lib/audit';
 
 export async function GET() {
   try {
@@ -110,15 +111,10 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    try {
-      await submitApproval('sermon', created.id, 'publish', u.id);
-    } catch (approvalError: any) {
-      console.error('Error submitting approval:', approvalError);
-      // Don't fail the whole request if approval submission fails
-      // The sermon was created, so we'll still return success
-    }
+    await submitApproval('sermon', created.id, 'publish', u.id);
+    await audit(u.id, 'request_publish_sermon', 'sermon', created.id, null, created);
 
-    return NextResponse.json({ ok: true, id: created.id });
+    return NextResponse.json({ ok: true, id: created.id, message: 'Saved. Another administrator must approve it before it is shown.' });
   } catch (error: any) {
     console.error('Unexpected error in POST /api/admin/sermons:', error);
     return NextResponse.json({ 
@@ -126,3 +122,5 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
+export const dynamic = 'force-dynamic';

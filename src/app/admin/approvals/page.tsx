@@ -7,6 +7,18 @@ const fetcher = (url:string) => fetch(url).then(r=>r.json());
 
 type FilterStatus = 'all' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
+const TYPE_LABELS: Record<string, string> = {
+  asset: 'Asset',
+  notice: 'Notice',
+  sermon: 'Sermon',
+  process: 'Process document',
+  booking: 'Hall booking',
+  church_bank_account: 'Church bank details',
+  individual: 'Birthday register',
+  anniversary: 'Wedding anniversary',
+  hall_settings: 'Hall hire rate',
+};
+
 function ApprovalsPageContent() {
   const searchParams = useSearchParams();
   const urlFilter = searchParams.get('filter') as FilterStatus | null;
@@ -52,9 +64,7 @@ function ApprovalsPageContent() {
       method:'POST', 
       headers:{'Content-Type':'application/json'}, 
       body: JSON.stringify({ 
-        resourceType:a.resourceType, 
-        resourceId:a.resourceId, 
-        comment: comment[a.id] || 'Approved' 
+ approvalId: a.id, comment: comment[a.id] || 'Approved' 
       }) 
     });
     if (res.status === 401) {
@@ -67,8 +77,9 @@ function ApprovalsPageContent() {
       setShowActions({ ...showActions, [a.id]: false });
       mutate();
     } else {
-      const errorText = await res.text();
-      alert(errorText || 'Failed to approve');
+      const body = await res.json().catch(() => ({}));
+      alert(body.error || 'Could not approve. Please try again.');
+      mutate();
     }
   }
 
@@ -87,9 +98,7 @@ function ApprovalsPageContent() {
       method:'POST', 
       headers:{'Content-Type':'application/json'}, 
       body: JSON.stringify({ 
-        resourceType:a.resourceType, 
-        resourceId:a.resourceId, 
-        comment: comment[a.id] 
+ approvalId: a.id, comment: comment[a.id] 
       }) 
     });
     if (res.status === 401) {
@@ -102,8 +111,9 @@ function ApprovalsPageContent() {
       setShowActions({ ...showActions, [a.id]: false });
       mutate();
     } else {
-      const errorText = await res.text();
-      alert(errorText || 'Failed to reject');
+      const body = await res.json().catch(() => ({}));
+      alert(body.error || 'Could not reject. Please try again.');
+      mutate();
     }
   }
   return (
@@ -147,7 +157,11 @@ function ApprovalsPageContent() {
           <div key={a.id} className="card">
             <div className="flex justify-between items-start">
               <div className="flex-1">
-                <div className="font-semibold text-lg">{a.resourceType} #{a.resourceId}</div>
+                <div className="font-semibold text-lg">{TYPE_LABELS[a.resourceType] || a.resourceType}{a.resourceId ? ` #${a.resourceId}` : ' (new)'}</div>
+                <div className="text-base text-gray-700">
+                  Requested by <strong>{a.submitter?.email === 'system@church.local' ? 'the public website' : (a.submitter?.name || a.submitter?.email || 'unknown')}</strong>
+                  {' '}on {new Date(a.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
                 <div className="text-sm text-gray-600 mb-2">
                   Action:{' '}
                   {a.action === 'confirm_payment'
@@ -162,7 +176,7 @@ function ApprovalsPageContent() {
                   · Status: {a.status}
                   {a.status === 'SUBMITTED' && !a.approver1 && (
                     <span className="ml-2 px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
-                      ⏳ Waiting for first approval
+                      ⏳ Waiting for another administrator to approve
                     </span>
                   )}
                   {a.status === 'SUBMITTED' && a.approver1 && !a.approver2 && (
@@ -235,6 +249,20 @@ function ApprovalsPageContent() {
                         />
                       </>
                     )}
+                  </div>
+                )}
+
+                {a.genericDetails && (
+                  <div className="mt-2 p-3 bg-slate-50 rounded border border-slate-200 text-base">
+                    <div className="font-semibold mb-2">{a.genericDetails.heading}</div>
+                    <dl className="grid gap-1">
+                      {a.genericDetails.rows.map(([label, value]: [string, string]) => (
+                        <div key={label} className="flex gap-2 flex-wrap">
+                          <dt className="font-semibold">{label}:</dt>
+                          <dd>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   </div>
                 )}
 
@@ -463,7 +491,14 @@ function ApprovalsPageContent() {
                   </div>
                 )}
               </div>
-              {a.status==='SUBMITTED' && (
+              {a.status==='SUBMITTED' && !a.canAct && (
+                <div className="ml-4 min-w-[200px] p-3 rounded bg-slate-100 text-base text-slate-700">
+                  {a.isMine
+                    ? 'You made this request. Another administrator must approve it.'
+                    : 'Only administrators can approve or reject.'}
+                </div>
+              )}
+              {a.status==='SUBMITTED' && a.canAct && (
                 <div className="ml-4 flex flex-col gap-2 min-w-[200px]">
                   {!showActions[a.id] ? (
                     <button className="btn" onClick={() => setShowActions({ ...showActions, [a.id]: true })}>

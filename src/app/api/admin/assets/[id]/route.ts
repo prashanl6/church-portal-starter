@@ -1,17 +1,14 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { getUserFromCookie } from '@/lib/auth';
+import { guardAdmin } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
+import { assetSchema, firstIssue } from '@/lib/validate';
 import { audit } from '@/lib/audit';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const u = getUserFromCookie();
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
-  if (u.role !== 'admin') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-  }
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const u = g.user;
   
   try {
     const body = await req.json();
@@ -41,25 +38,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     // Store the update data as JSON in comment1 (temporarily, will be replaced with approver comment)
-    const updateData = {
-      reference: body.reference !== undefined ? body.reference : existing.reference,
-      value: body.value !== undefined ? body.value : existing.value,
-      quantity: body.quantity !== undefined ? body.quantity : existing.quantity,
-      labelCategory: body.labelCategory !== undefined ? body.labelCategory : existing.labelCategory,
-      notes: body.notes !== undefined ? body.notes : existing.notes
-    };
-
-    // Submit update for approval with update data stored in comment1 as JSON
-    const approval = await prisma.approval.create({
-      data: {
-        resourceType: 'asset',
-        resourceId: id,
-        action: 'update',
-        submitterId: u.id,
-        status: 'SUBMITTED',
-        comment1: JSON.stringify(updateData) // Store update data temporarily
-      }
+    if (existing.status !== 'active') {
+      return NextResponse.json({ error: 'This asset is still waiting for approval and cannot be changed yet.' }, { status: 400 });
+    }
+    const parsed = assetSchema.safeParse({
+      reference: body.reference ?? existing.reference,
+      value: body.value ?? existing.value,
+      quantity: body.quantity ?? existing.quantity,
+      labelCategory: body.labelCategory ?? existing.labelCategory,
+      notes: body.notes !== undefined ? body.notes : existing.notes,
     });
+    if (!parsed.success) return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
+    const updateData = parsed.data;
+
+    const approval = await submitApproval('asset', id, 'update', u.id, updateData);
 
     await audit(u.id, 'request_update_asset', 'asset', id, existing, updateData);
     
@@ -71,13 +63,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const u = getUserFromCookie();
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
-  if (u.role !== 'admin') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-  }
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const u = g.user;
   
   try {
     const id = Number(params.id);
@@ -85,6 +73,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     const existing = await prisma.asset.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+    }
+    if (existing.status !== 'active') {
+      return NextResponse.json({ error: 'This asset is not in the register yet, so it cannot be deleted.' }, { status: 400 });
     }
 
     // Check if there's already a pending delete approval for this asset
@@ -112,3 +103,5 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 }
 
+
+export const dynamic = 'force-dynamic';

@@ -1,48 +1,38 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
+import { guardAdmin } from '@/lib/auth';
+import { submitApproval, hasPendingApproval } from '@/lib/approval';
+import { audit } from '@/lib/audit';
+import { anniversaryUpdateSchema, firstIssue, definedOnly } from '@/lib/validate';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const u = requireRole(['admin', 'staff']);
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const u = g.user;
+  const id = Number(params.id);
+
+  const existing = await prisma.weddingAnniversary.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: 'This anniversary was not found.' }, { status: 404 });
+
+  const parsed = anniversaryUpdateSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
+  const changes = definedOnly(parsed.data);
+  if (Object.keys(changes).length === 0) return NextResponse.json({ error: 'Nothing was changed.' }, { status: 400 });
+
+  const a = changes.individualAId ?? existing.individualAId;
+  const b = changes.individualBId ?? existing.individualBId;
+  if (a === b) return NextResponse.json({ error: 'Please choose two different people.' }, { status: 400 });
+
+  if (await hasPendingApproval('anniversary', id)) {
+    return NextResponse.json(
+      { error: 'A change for this anniversary is already waiting for approval.' },
+      { status: 409 }
+    );
   }
 
-  try {
-    const body = await req.json();
-    const id = Number(params.id);
-
-    const data: Record<string, unknown> = {};
-    if (typeof body.status === 'string') data.status = body.status;
-    if (body.anniversaryDate != null) data.anniversaryDate = new Date(body.anniversaryDate);
-    if (body.notes !== undefined) data.notes = body.notes === '' || body.notes == null ? null : String(body.notes);
-
-    if (body.individualAId != null || body.individualBId != null) {
-      const cur = await prisma.weddingAnniversary.findUnique({ where: { id } });
-      if (!cur) {
-        return NextResponse.json({ error: 'Anniversary not found' }, { status: 404 });
-      }
-      const newA = body.individualAId != null ? Number(body.individualAId) : cur.individualAId;
-      const newB = body.individualBId != null ? Number(body.individualBId) : cur.individualBId;
-      if (newA === newB) {
-        return NextResponse.json({ error: 'Choose two different individuals' }, { status: 400 });
-      }
-      data.individualAId = newA;
-      data.individualBId = newB;
-    }
-
-    if (Object.keys(data).length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
-    }
-
-    const updated = await prisma.weddingAnniversary.update({
-      where: { id },
-      data
-    });
-
-    return NextResponse.json({ ok: true, anniversary: updated });
-  } catch (error: unknown) {
-    console.error('Error in PATCH /api/admin/anniversaries/[id]:', error);
-    return NextResponse.json({ error: 'Failed to update anniversary' }, { status: 500 });
-  }
+  const ap = await submitApproval('anniversary', id, 'update', u.id, changes);
+  await audit(u.id, 'request_update_anniversary', 'anniversary', id, existing, changes);
+  return NextResponse.json({ ok: true, approvalId: ap.id, message: 'Your change has been sent for approval.' });
 }
+
+export const dynamic = 'force-dynamic';

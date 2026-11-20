@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Booking is not in a state to confirm payment' }, { status: 400 });
     }
 
-    if (!booking.slipUrl) {
+    if (!booking.slipUrl && !booking.slipFileId) {
       return NextResponse.json({ error: 'No payment receipt uploaded' }, { status: 400 });
     }
 
@@ -43,12 +43,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     // Approve the payment confirmation (this will update booking status and send email)
-    await approve('booking', id, u.id, 'Payment receipt confirmed');
+    await approve({ approvalId: approval.id }, u.id, 'Payment receipt confirmed');
 
     return NextResponse.json({ ok: true, message: 'Payment confirmed successfully' });
   } catch (error: any) {
     console.error('Error confirming payment:', error);
-    return NextResponse.json({ error: error.message || 'Failed to confirm payment' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to confirm payment' }, { status: error?.status || 500 });
   }
 }
 
+
+export const dynamic = 'force-dynamic';

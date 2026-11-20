@@ -6,3 +6,6 @@ node_modules
 .DS_Store
 prisma/*.db
 prisma/*.db-journal
+public/uploads/
+tsconfig.tsbuildinfo
+test-results/

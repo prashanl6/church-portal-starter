@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -u
-PROJECT_DIR="/Users/prashanbastiansz/Downloads/church-portal-starter"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR" || exit 1
 
 # Ensure dev server running; start if needed and detect which port it bound to

@@ -4,6 +4,7 @@ import { getUserFromCookie } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
 import { parseProcessAudience } from '@/lib/processAudience';
+import { sanitizeRichHtml } from '@/lib/sanitizeHtml';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const u = getUserFromCookie();
@@ -78,7 +79,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       removeAttachmentIds?: number[];
     } = {
       title: body.title !== undefined ? body.title : existing.title,
-      contentHtml: body.contentHtml !== undefined ? body.contentHtml : existing.contentHtml,
+      contentHtml: body.contentHtml !== undefined ? sanitizeRichHtml(String(body.contentHtml)) : existing.contentHtml,
       audience: nextAudience,
     };
     if (removeAttachmentIds.length) {
@@ -86,16 +87,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     // Submit update for approval with update data stored in comment1 as JSON
-    const approval = await prisma.approval.create({
-      data: {
-        resourceType: 'process',
-        resourceId: id,
-        action: 'update',
-        submitterId: u.id,
-        status: 'SUBMITTED',
-        comment1: JSON.stringify(updateData) // Store update data temporarily
-      }
-    });
+    const approval = await submitApproval('process', id, 'update', u.id, updateData);
 
     await audit(u.id, 'request_update_process', 'process', id, existing, updateData);
 
@@ -148,3 +140,5 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 }
 
+
+export const dynamic = 'force-dynamic';

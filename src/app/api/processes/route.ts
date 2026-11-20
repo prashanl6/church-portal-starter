@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
+import { sanitizeRichHtml } from '@/lib/sanitizeHtml';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,11 +15,11 @@ export async function GET() {
       },
       orderBy: { createdAt: 'desc' },
       include: {
-        attachments: { orderBy: { createdAt: 'asc' } },
+        attachments: { where: { status: 'active' }, orderBy: { createdAt: 'asc' } },
       },
     });
 
-    return NextResponse.json({ list });
+    return NextResponse.json({ list: list.map((p) => ({ ...p, contentHtml: sanitizeRichHtml(p.contentHtml) })) });
   } catch (error) {
     console.error('Error fetching processes:', error);
     return NextResponse.json({ list: [], error: 'Failed to fetch processes' }, { status: 500 });

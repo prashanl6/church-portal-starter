@@ -4,6 +4,7 @@ import { requireRole, getUserFromCookie } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
 import { parseProcessAudience } from '@/lib/processAudience';
+import { sanitizeRichHtml } from '@/lib/sanitizeHtml';
 
 export async function GET() {
   const u = requireRole(['admin', 'staff']);
@@ -19,7 +20,7 @@ export async function GET() {
         attachments: { orderBy: { createdAt: 'asc' } },
       },
     });
-    return NextResponse.json({ list });
+    return NextResponse.json({ list: list.map((p) => ({ ...p, contentHtml: sanitizeRichHtml(p.contentHtml) })) });
   } catch (error: any) {
     console.error('Error in GET /api/admin/processes:', error);
     return NextResponse.json({ error: 'Failed to fetch processes', list: [] }, { status: 500 });
@@ -49,8 +50,8 @@ export async function POST(req: Request) {
 
     const created = await prisma.processDoc.create({
       data: {
-        title,
-        contentHtml,
+        title: String(title).trim().slice(0, 300),
+        contentHtml: sanitizeRichHtml(String(contentHtml)),
         audience: aud.value,
         ownerUserId: u.id,
         status: 'submitted',
@@ -67,3 +68,5 @@ export async function POST(req: Request) {
   }
 }
 
+
+export const dynamic = 'force-dynamic';

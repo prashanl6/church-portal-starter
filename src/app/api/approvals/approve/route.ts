@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server';
-import { approve } from '@/lib/approval';
-import { getUserFromCookie } from '@/lib/auth';
+import { approve, ApprovalError } from '@/lib/approval';
+import { guardAdmin } from '@/lib/auth';
 
 export async function POST(req: Request) {
-  const { resourceType, resourceId, comment } = await req.json();
-  const u = getUserFromCookie();
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
+  const g = guardAdmin();
+  if ('response' in g) return g.response;
+  const body = await req.json().catch(() => ({}));
+  const approvalId = Number(body?.approvalId);
   try {
-    const result = await approve(resourceType, Number(resourceId), u.id, comment || '');
+    const result = Number.isInteger(approvalId) && approvalId > 0
+      ? await approve({ approvalId }, g.user.id, String(body?.comment ?? ''))
+      : await approve({ resourceType: String(body?.resourceType), resourceId: Number(body?.resourceId) }, g.user.id, String(body?.comment ?? ''));
     return NextResponse.json({ ok: true, result });
-  } catch (e:any) {
-    return new NextResponse(e.message, { status: 400 });
+  } catch (e: any) {
+    const status = e instanceof ApprovalError ? e.status : 500;
+    if (status === 500) console.error('approve failed', e);
+    return NextResponse.json({ error: status === 500 ? 'Something went wrong. Nothing was changed.' : e.message }, { status });
   }
 }
+
+export const dynamic = 'force-dynamic';

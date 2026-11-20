@@ -69,7 +69,9 @@ Plan **backups** and restore tests.
 
 ### 2.6 File uploads
 
-Attachments (e.g. process documents, payment slips) are stored under **`public/uploads/`** on disk. On a single VM, keep that directory on persistent storage and **include it in backups**. On serverless hosts, plan **blob storage** (S3, etc.) if you outgrow local disk.
+Payment slips and process attachments are stored **in the PostgreSQL database** (table `StoredFile`) and served through `/api/files/[id]`, which checks who is allowed to see each file. Nothing is written to the web server's disk, so this works on Vercel and other serverless hosts. Database backups therefore include the files. Limit: 4 MB per file (Vercel rejects larger uploads). Slips: JPG/PNG/PDF; process files: Excel/Word.
+
+Older files under `public/uploads/` (from before this change) are not migrated automatically and are no longer tracked in git.
 
 ### 2.7 Email (SMTP)
 

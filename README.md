@@ -42,7 +42,9 @@ To add only the **extra** admin3, admin4, staff2, staff3 accounts without re-run
 - Next.js (App Router) + Tailwind
 - Prisma + **PostgreSQL**
 - JWT auth (HttpOnly cookie), middleware-protected `/admin` routes
-- Generic approvals API (`/api/approvals`) and Approvals queue UI
+- **Maker–checker approvals** (`src/lib/approval.ts`): one admin submits a change and a *different* admin approves it before it goes live. Staff can view but never approve. Covers assets, notices, sermons, process documents, the birthday/anniversary register, the hall hire rate, church bank details and hall bookings. Every request, approval and rejection is in the audit log.
+- Uploaded files (payment slips, process attachments) are stored **in PostgreSQL** and served through `/api/files/[id]` with permission checks, so they survive redeploys on Vercel and are never public by URL.
+- Logins lock for 15 minutes after 5 wrong passwords. `JWT_SECRET` is **required** in production.
 - Audit log helper
 - Assets (Admin CRUD draft + submit for approval)
 - Notices (submit → dual-approve → publish flow; public list on `/notices`)
@@ -80,6 +82,16 @@ Email notifications are enabled for booking requests. To configure:
    - Use the App Password (not your regular password) in `SMTP_PASS`
 
 3. Update `NEXT_PUBLIC_BASE_URL` and `BASE_URL` to your production domain when deploying.
+
+## Checking the approval rules
+
+With the app running against a seeded database:
+
+```bash
+BASE_URL=http://localhost:3000 node tests/dual-control.api.mjs
+```
+
+It runs about 55 checks (maker cannot approve own change, staff cannot approve, bookings cannot clash, paid bookings cannot be cancelled, files are not public, and so on). Run it on a test database, not production: it creates test records and locks `staff3@example.com` for 15 minutes.
 
 ## Next Steps
 

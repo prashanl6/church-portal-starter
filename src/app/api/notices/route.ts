@@ -24,3 +24,5 @@ export async function GET() {
     return NextResponse.json({ list: [], error: 'Failed to fetch notices' }, { status: 500 });
   }
 }
+
+export const dynamic = 'force-dynamic';

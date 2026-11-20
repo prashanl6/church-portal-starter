@@ -16,8 +16,10 @@ function createPrismaClient(): PrismaClient {
 function getPrismaClient(): PrismaClient {
   let client = globalForPrisma.prisma;
   if (!client) {
+    // Always reuse one client. (Previously production skipped this cache, so every query
+    // opened a new connection pool and the database quickly ran out of connections.)
     client = createPrismaClient();
-    if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = client;
+    globalForPrisma.prisma = client;
     return client;
   }
   const c = client as unknown as {

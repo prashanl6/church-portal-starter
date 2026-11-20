@@ -1,3 +1,4 @@
+import { sanitizeRichHtml } from '@/lib/sanitizeHtml';
 import { prisma } from '@/lib/prisma';
 import type { ChurchIndividual, WeddingAnniversary } from '@prisma/client';
 import { sameMonthDay } from '@/lib/peopleUpcoming';
@@ -166,7 +167,7 @@ export async function hydrateNoticeBodyWithPeopleSnapshot(
 
   const { start, end } = getSnapshotRangeForWeekOf(weekOf);
   const block = buildSnapshotHtmlFromData(birthdayRows, anniversariesDb, start, end);
-  return `${stripNoticePeopleSnapshot(bodyHtml)}\n${block}`;
+  return `${sanitizeRichHtml(stripNoticePeopleSnapshot(bodyHtml))}\n${block}`;
 }
 
 export type NoticeLike = { bodyHtml: string; weekOf: Date };
@@ -203,7 +204,7 @@ export async function hydrateNoticeBodiesWithPeopleSnapshot<T extends NoticeLike
     const block = buildSnapshotHtmlFromData(birthdayRows, anniversariesDb, start, end);
     return {
       ...n,
-      bodyHtml: `${stripNoticePeopleSnapshot(n.bodyHtml)}\n${block}`
+      bodyHtml: `${sanitizeRichHtml(stripNoticePeopleSnapshot(n.bodyHtml))}\n${block}`
     };
   });
 }

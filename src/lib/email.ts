@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FROM_EMAIL = process.env.FROM_EMAIL || process.env.SMTP_USER || 'prashan.bastiansz@gmail.com';
+const FROM_EMAIL = process.env.FROM_EMAIL || process.env.SMTP_USER || '';
 const FROM_NAME = process.env.FROM_NAME || 'Church Portal';
 
 function escapeHtml(s: string): string {

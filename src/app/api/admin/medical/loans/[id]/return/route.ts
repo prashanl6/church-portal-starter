@@ -1,47 +1,28 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
+import { guardStaffOrAdmin } from '@/lib/auth';
+import { audit } from '@/lib/audit';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const u = requireRole(['admin', 'staff']);
-  if (!u) {
-    return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
-  }
-
-  try {
-    const body = await req.json();
-    const loanId = Number(params.id);
-    const loan = await prisma.medicalLoan.findUnique({ 
-      where: { id: loanId },
-      include: { item: true }
+  const g = guardStaffOrAdmin();
+  if ('response' in g) return g.response;
+  const body = await req.json().catch(() => ({}));
+  const loanId = Number(params.id);
+  const loan = await prisma.medicalLoan.findUnique({ where: { id: loanId } });
+  if (!loan) return NextResponse.json({ error: 'This loan was not found.' }, { status: 404 });
+  const condition = body?.condition ? String(body.condition).slice(0, 500) : null;
+  const done = await prisma.$transaction(async (tx) => {
+    const res = await tx.medicalLoan.updateMany({
+      where: { id: loanId, returned: false },
+      data: { returned: true, returnedAt: new Date(), conditionOnReturn: condition },
     });
-    
-    if (!loan) {
-      return NextResponse.json({ error: 'Loan not found' }, { status: 404 });
-    }
-    if (loan.returned) {
-      return NextResponse.json({ error: 'Loan already returned' }, { status: 400 });
-    }
-
-    await prisma.medicalLoan.update({
-      where: { id: loanId },
-      data: {
-        returned: true,
-        returnedAt: new Date(),
-        conditionOnReturn: body.condition || null
-      }
-    });
-
-    // Restore available quantity
-    await prisma.medicalItem.update({
-      where: { id: loan.itemId },
-      data: { quantityAvailable: loan.item.quantityAvailable + 1 }
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/medical/loans/[id]/return:', error);
-    return NextResponse.json({ error: 'Failed to return loan' }, { status: 500 });
-  }
+    if (res.count === 0) return false;
+    await tx.medicalItem.update({ where: { id: loan.itemId }, data: { quantityAvailable: { increment: 1 } } });
+    return true;
+  });
+  if (!done) return NextResponse.json({ error: 'This item has already been returned.' }, { status: 409 });
+  await audit(g.user.id, 'return_medical_loan', 'medical_loan', loanId, null, { returned: true, condition });
+  return NextResponse.json({ ok: true });
 }
 
+export const dynamic = 'force-dynamic';
