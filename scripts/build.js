@@ -34,6 +34,13 @@ const vercelEnv = process.env.VERCEL_ENV;
 const skipMigrations =
   process.env.SKIP_DB_MIGRATIONS === '1' || (vercelEnv !== undefined && vercelEnv !== 'production');
 
+// Report whether the database is reachable (never prints the password). Informational only.
+try {
+  execSync('node scripts/db-check.js', { stdio: 'inherit' });
+} catch {
+  console.log('Database check reported a problem (details above).');
+}
+
 if (skipMigrations) {
   console.log(
     `Skipping database migrations (${vercelEnv ? `VERCEL_ENV=${vercelEnv}` : 'SKIP_DB_MIGRATIONS=1'}). ` +

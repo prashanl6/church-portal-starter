@@ -7,7 +7,7 @@
  *
  *   node scripts/seed-reference-data.js
  */
-require('./load-env-from-dotenv.cjs');
+require('./load-env-from-dotenv.cjs').loadEnvFromProjectRoot();
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
