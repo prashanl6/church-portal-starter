@@ -39,7 +39,7 @@ Default app URL is often `http://localhost:3000` unless you use another port; al
 
 ### 2.3 Production build
 
-The `build` script runs migrations, generates the Prisma client, a small legacy data helper, then `next build`:
+The `build` script (`scripts/build.js`) runs migrations, generates the Prisma client, a small legacy data helper, then `next build`:
 
 ```bash
 npm run build
@@ -48,6 +48,10 @@ npm run start
 
 Ensure **`DATABASE_URL`** is valid on the build host **before** `npm run build`, because `prisma migrate deploy` runs during build.
 
+**Only production builds touch the database.** On Vercel, preview builds (`VERCEL_ENV=preview` or `development`) skip `prisma migrate deploy` and the legacy helper, so a branch can never change the live database. They compile without a database connection. Builds outside Vercel run migrations unless you set `SKIP_DB_MIGRATIONS=1`.
+
+Preview deployments still **use** whatever `DATABASE_URL` they are given while running. If it points at the live database, anyone testing a preview writes real data. Give the **Preview** environment its own database (for example a Neon branch) in Vercel → Settings → Environment Variables.
+
 ### 2.4 Database (PostgreSQL)
 
 The app uses **PostgreSQL**. Provision a database (Vercel Postgres, Neon, Supabase, RDS, a VPS install, etc.) and set **`DATABASE_URL`**:
@@ -55,7 +59,7 @@ The app uses **PostgreSQL**. Provision a database (Vercel Postgres, Neon, Supaba
 - Typical local URL: `postgresql://USER:PASSWORD@localhost:5432/DBNAME?schema=public`
 - Many hosted providers require TLS: append **`?sslmode=require`** (or use their Prisma-specific connection string).
 
-**Builds** run `prisma migrate deploy`, so the build environment must reach the database (Vercel: store `DATABASE_URL` in project env vars so the build step can connect).
+**Production builds** run `prisma migrate deploy`, so the production build environment must reach the database (Vercel: store `DATABASE_URL` in project env vars so the build step can connect).
 
 Plan **backups** and restore tests.
 
@@ -175,7 +179,7 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 ### 7.1 Migrations
 
 - New database changes ship as SQL under `prisma/migrations/`.
-- **Production**: `npm run build` already runs `prisma migrate deploy`. For manual runs: `npx prisma migrate deploy`.
+- **Production**: `npm run build` already runs `prisma migrate deploy` (preview builds on Vercel skip it). For manual runs: `npx prisma migrate deploy`.
 - Always **back up** the database before major upgrades.
 
 ### 7.2 Secrets and rotation
@@ -219,7 +223,7 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 | Emails not sending | SMTP vars, provider blocking “less secure” apps, `FROM_EMAIL` alignment with provider. |
 | Cron always401/500 | `CRON_SECRET` set in production but scheduler missing `Authorization: Bearer ...`. |
 | Processes missing for public | Status must be **published** and tag **Public** for anonymous users. |
-| Build fails on migrate | `DATABASE_URL` unreachable from build environment; run migrations in CI with DB access. |
+| Build fails on migrate (`P1001`) | `DATABASE_URL` unreachable from the production build: check the database is running and not suspended or over quota (Neon console), and that the URL is current. |
 
 ### 8.1 First admin on production (e.g. Vercel)
 
