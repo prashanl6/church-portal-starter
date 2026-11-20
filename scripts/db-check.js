@@ -10,7 +10,7 @@ require('./load-env-from-dotenv.cjs').loadEnvFromProjectRoot();
 const { execSync } = require('child_process');
 
 async function main() {
-  const raw = process.env.DATABASE_URL || '';
+  const raw = require('../src/lib/databaseUrl.js').resolveDatabaseUrl() || '';
   let url;
   try {
     url = new URL(raw);

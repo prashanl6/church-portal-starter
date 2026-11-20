@@ -11,6 +11,14 @@
  * Set SKIP_DB_MIGRATIONS=1 to skip them anywhere.
  */
 const { execSync } = require('child_process');
+const { resolveDatabaseUrl, databaseUrlSource } = require('../src/lib/databaseUrl.js');
+
+// Use the same database the app will use (e.g. one connected via Vercel → Storage).
+// Every command below inherits this, including Prisma migrations and the seed scripts.
+if (resolveDatabaseUrl()) {
+  console.log(`Database setting in use: ${databaseUrlSource()}`);
+  process.env.DATABASE_URL = resolveDatabaseUrl();
+}
 
 function run(cmd) {
   console.log(`\n> ${cmd}`);
