@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { computeHallBookingCharge } from '@/lib/hallBookingPricing';
 import { PageHeader, Alert, DateChip, longDate } from '@/components/ui';
-import { IconCalendar } from '@/components/Icons';
+import { IconCalendar, IconCheck } from '@/components/Icons';
 
 const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -20,6 +20,7 @@ export default function BookHallPage() {
   });
   const [msg, setMsg] = useState('');
   const [bookingRef, setBookingRef] = useState('');
+  const [lookupRef, setLookupRef] = useState('');
   const [booked, setBooked] = useState<any[]>([]);
   const [ratePer30Minutes, setRatePer30Minutes] = useState<number>(0);
 
@@ -79,6 +80,7 @@ export default function BookHallPage() {
     if (res.ok) {
       setBookingRef(data.bookingRef || '');
       setMsg('Request submitted.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setMsg(typeof data.error === 'string' ? data.error : 'Could not submit request');
     }
@@ -87,13 +89,73 @@ export default function BookHallPage() {
   const upcoming = booked.filter((b) => new Date(b.date) >= new Date());
   const submitted = msg.includes('submitted');
 
+  // After sending, show only the confirmation, so the request cannot be sent twice by mistake.
+  if (submitted && bookingRef) {
+    return (
+      <div className="page panel-enter" style={{ maxWidth: '36rem', margin: '0 auto', width: '100%' }}>
+        <div className="card" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+          <span className="tile-icon" style={{ margin: '0 auto 1rem', background: 'var(--success-soft)', color: '#2f6b47' }}>
+            <IconCheck />
+          </span>
+          <h1 className="page-title" style={{ fontSize: '2rem' }}>Request sent</h1>
+          <p style={{ color: 'var(--text-2)', fontSize: '1.1rem', margin: '0 0 1.5rem' }}>
+            The church office will review it. Please keep your booking reference:
+          </p>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 700, letterSpacing: '0.06em', margin: '0 0 1.5rem' }}>
+            {bookingRef}
+          </p>
+          <p style={{ color: 'var(--text-2)', margin: '0 0 1.75rem' }}>
+            Open your booking page any time to see if it is approved, how much to pay and where to pay.
+          </p>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <a className="btn" href={`/booking/${bookingRef}`}>Open my booking</a>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setBookingRef('');
+                setMsg('');
+              }}
+            >
+              Make another booking
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <PageHeader
         eyebrow="Main Hall and Chapel"
         title="Book the hall"
-        subtitle="Send a request for the Main Hall or Chapel. An administrator will reply by email once it is approved."
+        subtitle="Send a request for the Main Hall or Chapel. You get a booking reference to check its progress and pay once approved."
       />
+
+      {/* For people who already sent a request and lost the link. */}
+      <form
+        className="card"
+        style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.75rem', padding: '1.25rem 1.5rem' }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const ref = lookupRef.trim().toUpperCase();
+          if (ref) window.location.href = `/booking/${encodeURIComponent(ref)}`;
+        }}
+      >
+        <div style={{ flex: '1 1 14rem' }}>
+          <label className="label" htmlFor="bk-lookup">Already sent a request? Enter your booking reference</label>
+          <input
+            id="bk-lookup"
+            className="input"
+            placeholder="For example: BA5TPPHJH"
+            value={lookupRef}
+            onChange={(e) => setLookupRef(e.target.value)}
+            autoCapitalize="characters"
+          />
+        </div>
+        <button className="btn-secondary" type="submit">Check my booking</button>
+      </form>
 
       <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 22rem), 1fr))', alignItems: 'start' }}>
         <form onSubmit={submit} className="card stack" style={{ gap: '1.75rem', gridColumn: 'span 1' }}>
@@ -114,7 +176,7 @@ export default function BookHallPage() {
                 <label className="label" htmlFor="bk-email">Email</label>
                 <input id="bk-email" type="email" className="input" autoComplete="email" value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                <p className="hint">We send your approval and payment details here.</p>
+                <p className="hint">So the church office can contact you about your booking.</p>
               </div>
               <div>
                 <label className="label" htmlFor="bk-phone">Phone</label>

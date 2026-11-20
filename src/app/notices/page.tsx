@@ -27,7 +27,20 @@ export default function NoticesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // The phone/browser Back button closes an open notice instead of leaving the site.
+  useEffect(() => {
+    const onPop = () => setSelectedNotice(null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const closeNotice = () => {
+    if (window.history.state?.notice) window.history.back();
+    else setSelectedNotice(null);
+  };
+
   const openNotice = (notice: Notice) => {
+    window.history.pushState({ notice: notice.id }, '');
     setSelectedNotice(notice);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -47,7 +60,7 @@ export default function NoticesPage() {
         <div>
           <button
             type="button"
-            onClick={() => setSelectedNotice(null)}
+            onClick={closeNotice}
             className="back-link"
             style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }}
           >
@@ -70,7 +83,7 @@ export default function NoticesPage() {
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '0.75rem' }}>
-          <button type="button" className="btn-secondary" onClick={() => setSelectedNotice(null)}>
+          <button type="button" className="btn-secondary" onClick={closeNotice}>
             Back to all notices
           </button>
         </div>

@@ -128,7 +128,7 @@ export default function BookingDetailsPage() {
         <EmptyState
           icon={<IconCalendar />}
           title="Booking not found"
-          text="We could not find a booking with this reference. Please check the link in your email, or contact the church office."
+          text="We could not find a booking with this reference. Please check the reference (it starts with B and has 9 letters and numbers), or contact the church office."
           action={<a className="btn-secondary" href="/book-hall">Go to hall bookings</a>}
         />
       </div>
@@ -189,7 +189,9 @@ export default function BookingDetailsPage() {
         )}
         {booking.amount ? (
           <div style={{ padding: '1.1rem 1.25rem', borderRadius: 'var(--radius)', background: 'var(--bg)', border: '1px solid var(--line)' }}>
-            <div style={{ color: 'var(--text-2)', fontWeight: 600 }}>Amount to pay</div>
+            <div style={{ color: 'var(--text-2)', fontWeight: 600 }}>
+              {booking.status === 'REQUESTED' ? 'Estimated cost (pay only after approval)' : 'Amount to pay'}
+            </div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.025em' }}>
               LKR {booking.amount.toLocaleString()}
             </div>
