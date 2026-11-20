@@ -58,6 +58,16 @@ async function main() {
       return false;
     }
   };
+  // Neon's own driver talks to the database over HTTPS (port 443) instead of port 5432.
+  if (/\.neon\.tech$/.test(url.hostname)) {
+    try {
+      const { neon } = require('@neondatabase/serverless');
+      const rows = await neon(raw)`SELECT 1 AS ok`;
+      console.log(`[db-check] SELECT 1 over HTTPS (Neon driver) ok: ${JSON.stringify(rows)}`);
+    } catch (e) {
+      console.log(`[db-check] SELECT 1 over HTTPS (Neon driver) failed: ${String(e.message || e).replace(/postgres(ql)?:\/\/[^\s'"`]+/g, '<url>').slice(0, 300)}`);
+    }
+  }
   if (trySelect('as configured', raw)) return 0;
   if (process.env.DB_CHECK_VARIANTS === '1') {
     const noCb = new URL(raw);
