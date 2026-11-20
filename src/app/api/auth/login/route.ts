@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     );
   }
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(AUTH_COOKIE_NAME, result.token, getAuthCookieOptions());
+  res.cookies.set(AUTH_COOKIE_NAME, result.token, getAuthCookieOptions(req));
   return res;
 }
 

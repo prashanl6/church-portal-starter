@@ -135,7 +135,15 @@ function bookingEmailDetails(b: any) {
 }
 
 function baseUrl() {
-  return (process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || 'http://localhost:3000').trim().replace(/\/$/, '');
+  // Falls back to the address Vercel gives the live site, so email links work without extra setup.
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  return (
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.BASE_URL ||
+    (vercelHost ? `https://${vercelHost}` : 'http://localhost:3000')
+  )
+    .trim()
+    .replace(/\/$/, '');
 }
 
 function toDate(v: unknown): Date | null {

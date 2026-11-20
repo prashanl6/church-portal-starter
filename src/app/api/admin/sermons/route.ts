@@ -1,10 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { getUserFromCookie } from '@/lib/auth';
+import { getUserFromCookie, guardStaffOrAdmin } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
 
 export async function GET() {
+  // Includes sermons still waiting for approval, so only signed-in staff and admins may list them.
+  const g = guardStaffOrAdmin();
+  if ('response' in g) return g.response;
   try {
     const list = await prisma.sermon.findMany({ orderBy: { date: 'desc' }, take: 50 });
     return NextResponse.json({ list });

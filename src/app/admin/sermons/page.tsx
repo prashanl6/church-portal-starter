@@ -1,8 +1,22 @@
 "use client";
 import { useState, useMemo } from 'react';
-import { PageHeader, ADMIN_BACK, Alert } from '@/components/ui';
+import useSWR from 'swr';
+import { PageHeader, ADMIN_BACK, Alert, DateChip, StatusBadge } from '@/components/ui';
+
+type SermonRow = { id: number; title: string; speaker: string; date: string; status: string };
+const fetcher = (u: string) => fetch(u).then((r) => (r.ok ? r.json() : { list: [] }));
 
 export default function AdminSermonsPage() {
+  const { data, mutate } = useSWR('/api/admin/sermons', fetcher);
+  const sermons: SermonRow[] = data?.list || [];
+
+  const requestDelete = async (s: SermonRow) => {
+    if (!window.confirm(`Ask to remove the sermon "${s.title}"? A second administrator must approve before it disappears.`)) return;
+    const res = await fetch(`/api/admin/sermons/${s.id}`, { method: 'DELETE' });
+    const body = await res.json().catch(() => ({}));
+    alert(res.ok ? 'Removal sent for approval.' : body.error || 'Could not send the removal request.');
+    mutate();
+  };
   const [title, setTitle] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [theme, setTheme] = useState('');
@@ -82,40 +96,14 @@ export default function AdminSermonsPage() {
         return;
       }
       if (!res.ok) {
-        let errorMsg = 'Failed to submit sermon';
-        const contentType = res.headers.get('content-type') || '';
-        
-        // Check if we got HTML (404 page) instead of JSON
-        if (contentType.includes('text/html')) {
-          errorMsg = 'API route not found. Please restart the development server.';
-          console.error('Received HTML instead of JSON. This usually means the API route is not being recognized.');
-        } else if (contentType.includes('application/json')) {
-          try {
-            const errorData = await res.json();
-            errorMsg = errorData.error || errorMsg;
-          } catch {
-            // Fallback to default
-          }
-        } else {
-          try {
-            const text = await res.text();
-            // If it looks like HTML, it's probably a 404 page
-            if (text.trim().startsWith('<!DOCTYPE') || text.includes('404')) {
-              errorMsg = 'API route not found. Please restart the development server.';
-            } else {
-              errorMsg = text || errorMsg;
-            }
-          } catch {
-            // Fallback to default
-          }
-        }
-        throw new Error(errorMsg);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Could not submit the sermon.');
       }
-      const body = await res.json();
       setMsg('Sermon submitted for approval');
+      mutate();
       setTitle(''); setSpeaker(''); setTheme(''); setLink(''); setWeekOf('');
     } catch (err: any) {
-      setMsg('Error: ' + (err.message || String(err)));
+      setMsg(err.message || String(err));
     } finally { setLoading(false); }
   }
 
@@ -173,6 +161,31 @@ export default function AdminSermonsPage() {
           </div>
         )}
       </form>
+
+      <section>
+        <h2 className="section-label">All sermons</h2>
+        {sermons.length === 0 ? (
+          <p className="hint">No sermons yet.</p>
+        ) : (
+          <div className="list-group">
+            {sermons.map((s) => (
+              <div key={s.id} className="list-row" style={{ cursor: 'default' }}>
+                <DateChip date={s.date} />
+                <span className="list-row-main">
+                  <span className="list-row-title">{s.title}</span>
+                  <span className="list-row-meta">{s.speaker}</span>
+                </span>
+                <StatusBadge status={s.status} />
+                {s.status === 'published' && (
+                  <button type="button" className="btn-quiet danger" onClick={() => requestDelete(s)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

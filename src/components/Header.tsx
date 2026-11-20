@@ -22,6 +22,7 @@ export default function Header() {
   const [userName, setUserName] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pending, setPending] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -31,6 +32,13 @@ export default function Header() {
           const data = await res.json();
           setUserName(data.name || data.email || null);
           setUserRole(data.role === 'admin' || data.role === 'staff' ? data.role : null);
+          // Admins see how many changes wait for approval next to the Admin link.
+          if (data.role === 'admin') {
+            const c = await fetch('/api/approvals/count').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+            setPending(typeof c?.count === 'number' ? c.count : 0);
+          } else {
+            setPending(0);
+          }
         } else {
           setUserName(null);
           setUserRole(null);
@@ -101,6 +109,9 @@ export default function Header() {
                 aria-current={isActive(pathname, l.href) ? 'page' : undefined}
               >
                 {l.label}
+                {l.href === '/admin' && pending > 0 && (
+                  <span className="nav-count" aria-label={`${pending} waiting for approval`}>{pending}</span>
+                )}
               </Link>
             ))}
           </nav>
@@ -151,7 +162,10 @@ export default function Header() {
                   style={{ animationDelay: `${80 + i * 55}ms` }}
                   onClick={() => setMenuOpen(false)}
                 >
-                  {l.label}
+                  <span>
+                    {l.label}
+                    {l.href === '/admin' && pending > 0 && <span className="nav-count">{pending}</span>}
+                  </span>
                   <IconArrow size={24} />
                 </Link>
               ))}

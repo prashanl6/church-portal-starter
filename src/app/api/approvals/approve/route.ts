@@ -7,6 +7,9 @@ export async function POST(req: Request) {
   if ('response' in g) return g.response;
   const body = await req.json().catch(() => ({}));
   const approvalId = Number(body?.approvalId);
+  if (!(Number.isInteger(approvalId) && approvalId > 0) && !(body?.resourceType && Number(body?.resourceId) > 0)) {
+    return NextResponse.json({ error: 'Please choose which request to approve.' }, { status: 400 });
+  }
   try {
     const result = Number.isInteger(approvalId) && approvalId > 0
       ? await approve({ approvalId }, g.user.id, String(body?.comment ?? ''))

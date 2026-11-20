@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { guardAdmin } from '@/lib/auth';
+import { guardAdmin, guardStaffOrAdmin } from '@/lib/auth';
 import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
 import { noticeSchema, firstIssue } from '@/lib/validate';
@@ -8,6 +8,9 @@ import { sanitizeRichHtml } from '@/lib/sanitizeHtml';
 import { hydrateNoticeBodiesWithPeopleSnapshot } from '@/lib/noticePeopleSnapshot';
 
 export async function GET() {
+  // Includes drafts and pending notices, so only signed-in staff and admins may list them.
+  const g = guardStaffOrAdmin();
+  if ('response' in g) return g.response;
   const list = await prisma.notice.findMany({ orderBy: { weekOf: 'desc' }, take: 50 });
   const hydrated = await hydrateNoticeBodiesWithPeopleSnapshot(list);
   return NextResponse.json({ list: hydrated });

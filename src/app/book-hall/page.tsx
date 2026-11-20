@@ -19,6 +19,7 @@ export default function BookHallPage() {
     notes: ''
   });
   const [msg, setMsg] = useState('');
+  const [bookingRef, setBookingRef] = useState('');
   const [booked, setBooked] = useState<any[]>([]);
   const [ratePer30Minutes, setRatePer30Minutes] = useState<number>(0);
 
@@ -62,20 +63,22 @@ export default function BookHallPage() {
         ? `Submit this booking request?\n\nEstimated hall hire: LKR ${fmt(quote.total)} (${quote.slots} × 30 min block${quote.slots !== 1 ? 's' : ''} at LKR ${fmt(ratePer30Minutes)} each)\n\nYou will still need admin approval before payment.`
         : 'Submit this booking request? (No hall hire rate is configured yet — amount may be zero.)';
     if (!window.confirm(confirmMsg)) return;
+    setBookingRef('');
 
     const res = await fetch('/api/bookings/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
     });
-    let data: { error?: string } = {};
+    let data: { error?: string; bookingRef?: string } = {};
     try {
       data = await res.json();
     } catch {
       /* ignore */
     }
     if (res.ok) {
-      setMsg('Request submitted. You will receive an email if approved.');
+      setBookingRef(data.bookingRef || '');
+      setMsg('Request submitted.');
     } else {
       setMsg(typeof data.error === 'string' ? data.error : 'Could not submit request');
     }
@@ -194,7 +197,20 @@ export default function BookHallPage() {
             <button className="btn btn-primary" style={{ width: '100%' }}>
               Submit Request
             </button>
-            {msg && <Alert tone={submitted ? 'success' : 'error'}>{msg}</Alert>}
+            {msg && (
+              <Alert tone={submitted ? 'success' : 'error'}>
+                {msg}
+                {submitted && bookingRef && (
+                  <>
+                    {' '}Your booking reference is <strong>{bookingRef}</strong>. Keep this page to check your
+                    booking and pay once it is approved:{' '}
+                    <a href={`/booking/${bookingRef}`} style={{ fontWeight: 600 }}>
+                      Open my booking
+                    </a>
+                  </>
+                )}
+              </Alert>
+            )}
           </div>
         </form>
 

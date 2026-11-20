@@ -11,6 +11,13 @@ export async function GET(req: Request, { params }: { params: { bookingRef: stri
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
+    // Church bank details are shown to the person who booked once it is approved, so they can
+    // pay even if the approval email does not arrive. The reference link acts as the key.
+    const bank =
+      booking.status === 'APPROVED_PENDING_PAYMENT'
+        ? await prisma.churchBankAccount.findUnique({ where: { id: 1 } }).catch(() => null)
+        : null;
+
     return NextResponse.json({
       // Only what the person who booked needs to see. No internal ids or file links.
       booking: {
@@ -27,6 +34,9 @@ export async function GET(req: Request, { params }: { params: { bookingRef: stri
         amount: booking.amount,
         paymentRef: booking.paymentRef,
         slipReceived: !!(booking.slipFileId || booking.slipUrl),
+        bankAccount: bank
+          ? { accountName: bank.accountName, accountNumber: bank.accountNumber, bankName: bank.bankName, branch: bank.branch }
+          : null,
       },
     });
   } catch (error) {

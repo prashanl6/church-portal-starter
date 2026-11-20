@@ -415,8 +415,8 @@ export default function PeopleEventsPage() {
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="label">From date</label>
-                <input
+                <label className="label" htmlFor="people-field-1">From date</label>
+                <input id="people-field-1"
                   className="input max-w-xs"
                   type="date"
                   value={birthdayFromInput}
@@ -424,8 +424,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">To date</label>
-                <input
+                <label className="label" htmlFor="people-field-2">To date</label>
+                <input id="people-field-2"
                   className="input max-w-xs"
                   type="date"
                   value={birthdayToInput}
@@ -507,11 +507,11 @@ export default function PeopleEventsPage() {
                       {expandedIndividualId === e.id && (
                         <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div>
-                            <label className="label">Date of death (optional)</label>
+                            <label className="label" htmlFor="people-field-3">Date of death (optional)</label>
                             <p className="text-xs text-gray-500 mb-2">
                               Saving a date of death deactivates this record automatically.
                             </p>
-                            <input
+                            <input id="people-field-3"
                               className="input max-w-xs"
                               type="date"
                               value={deathDateDraft[e.id] ?? ''}
@@ -545,8 +545,8 @@ export default function PeopleEventsPage() {
             <h2 className="section-label">Add individual (birthday)</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="label">Name</label>
-                <input
+                <label className="label" htmlFor="people-field-4">Name</label>
+                <input id="people-field-4"
                   className="input"
                   value={birthdayForm.displayName}
                   onChange={(ev) => setBirthdayForm({ ...birthdayForm, displayName: ev.target.value })}
@@ -554,8 +554,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">Date of birth</label>
-                <input
+                <label className="label" htmlFor="people-field-5">Date of birth</label>
+                <input id="people-field-5"
                   className="input"
                   type="date"
                   value={birthdayForm.birthDate}
@@ -566,8 +566,8 @@ export default function PeopleEventsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="label">Email (optional)</label>
-                <input
+                <label className="label" htmlFor="people-field-6">Email (optional)</label>
+                <input id="people-field-6"
                   className="input"
                   type="email"
                   value={birthdayForm.email}
@@ -575,8 +575,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">Phone (optional)</label>
-                <input
+                <label className="label" htmlFor="people-field-7">Phone (optional)</label>
+                <input id="people-field-7"
                   className="input"
                   type="tel"
                   value={birthdayForm.phone}
@@ -585,8 +585,8 @@ export default function PeopleEventsPage() {
               </div>
             </div>
             <div>
-              <label className="label">Notes (optional)</label>
-              <textarea
+              <label className="label" htmlFor="people-field-8">Notes (optional)</label>
+              <textarea id="people-field-8"
                 className="input"
                 value={birthdayForm.notes}
                 onChange={(ev) => setBirthdayForm({ ...birthdayForm, notes: ev.target.value })}
@@ -608,8 +608,8 @@ export default function PeopleEventsPage() {
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="label">From date</label>
-                <input
+                <label className="label" htmlFor="people-field-9">From date</label>
+                <input id="people-field-9"
                   className="input max-w-xs"
                   type="date"
                   value={anniversaryFromInput}
@@ -617,8 +617,8 @@ export default function PeopleEventsPage() {
                 />
               </div>
               <div>
-                <label className="label">To date</label>
-                <input
+                <label className="label" htmlFor="people-field-10">To date</label>
+                <input id="people-field-10"
                   className="input max-w-xs"
                   type="date"
                   value={anniversaryToInput}
@@ -691,8 +691,8 @@ export default function PeopleEventsPage() {
                         <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="label">Person 1</label>
-                              <select
+                              <label className="label" htmlFor="people-field-11">Person 1</label>
+                              <select id="people-field-11"
                                 className="input"
                                 value={anniversaryDraft.individualAId}
                                 onChange={(ev) =>
@@ -707,8 +707,8 @@ export default function PeopleEventsPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="label">Person 2</label>
-                              <select
+                              <label className="label" htmlFor="people-field-12">Person 2</label>
+                              <select id="people-field-12"
                                 className="input"
                                 value={anniversaryDraft.individualBId}
                                 onChange={(ev) =>
@@ -724,8 +724,8 @@ export default function PeopleEventsPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="label">Anniversary date</label>
-                            <input
+                            <label className="label" htmlFor="people-field-13">Anniversary date</label>
+                            <input id="people-field-13"
                               className="input max-w-xs"
                               type="date"
                               value={anniversaryDraft.anniversaryDate}
@@ -735,8 +735,8 @@ export default function PeopleEventsPage() {
                             />
                           </div>
                           <div>
-                            <label className="label">Notes</label>
-                            <textarea
+                            <label className="label" htmlFor="people-field-14">Notes</label>
+                            <textarea id="people-field-14"
                               className="input"
                               rows={2}
                               value={anniversaryDraft.notes}
@@ -776,8 +776,8 @@ export default function PeopleEventsPage() {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="label">Person 1</label>
-                <select
+                <label className="label" htmlFor="people-field-15">Person 1</label>
+                <select id="people-field-15"
                   className="input"
                   value={anniversaryForm.individualAId}
                   onChange={(ev) => setAnniversaryForm({ ...anniversaryForm, individualAId: ev.target.value })}
@@ -792,8 +792,8 @@ export default function PeopleEventsPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Person 2</label>
-                <select
+                <label className="label" htmlFor="people-field-16">Person 2</label>
+                <select id="people-field-16"
                   className="input"
                   value={anniversaryForm.individualBId}
                   onChange={(ev) => setAnniversaryForm({ ...anniversaryForm, individualBId: ev.target.value })}
@@ -809,8 +809,8 @@ export default function PeopleEventsPage() {
               </div>
             </div>
             <div>
-              <label className="label">Anniversary date</label>
-              <input
+              <label className="label" htmlFor="people-field-17">Anniversary date</label>
+              <input id="people-field-17"
                 className="input max-w-xs"
                 type="date"
                 value={anniversaryForm.anniversaryDate}
@@ -819,8 +819,8 @@ export default function PeopleEventsPage() {
               />
             </div>
             <div>
-              <label className="label">Notes (optional)</label>
-              <textarea
+              <label className="label" htmlFor="people-field-18">Notes (optional)</label>
+              <textarea id="people-field-18"
                 className="input"
                 value={anniversaryForm.notes}
                 onChange={(ev) => setAnniversaryForm({ ...anniversaryForm, notes: ev.target.value })}
@@ -895,12 +895,12 @@ export default function PeopleEventsPage() {
                       {expandedIndividualId === e.id && (
                         <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div>
-                            <label className="label">Date of death (optional)</label>
+                            <label className="label" htmlFor="people-field-19">Date of death (optional)</label>
                             <p className="text-xs text-gray-500 mb-2">
                               Clear this if it was set in error; saving empty does not auto-activate—you can use
                               Reactivate.
                             </p>
-                            <input
+                            <input id="people-field-19"
                               className="input max-w-xs"
                               type="date"
                               value={deathDateDraft[e.id] ?? ''}
@@ -1004,8 +1004,8 @@ export default function PeopleEventsPage() {
                         <div className="mt-4 pt-4 border-t border-slate-200 grid gap-3 panel-enter">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="label">Person 1</label>
-                              <select
+                              <label className="label" htmlFor="people-field-20">Person 1</label>
+                              <select id="people-field-20"
                                 className="input"
                                 value={anniversaryDraft.individualAId}
                                 onChange={(ev) =>
@@ -1024,8 +1024,8 @@ export default function PeopleEventsPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="label">Person 2</label>
-                              <select
+                              <label className="label" htmlFor="people-field-21">Person 2</label>
+                              <select id="people-field-21"
                                 className="input"
                                 value={anniversaryDraft.individualBId}
                                 onChange={(ev) =>
@@ -1045,8 +1045,8 @@ export default function PeopleEventsPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="label">Anniversary date</label>
-                            <input
+                            <label className="label" htmlFor="people-field-22">Anniversary date</label>
+                            <input id="people-field-22"
                               className="input max-w-xs"
                               type="date"
                               value={anniversaryDraft.anniversaryDate}
@@ -1056,8 +1056,8 @@ export default function PeopleEventsPage() {
                             />
                           </div>
                           <div>
-                            <label className="label">Notes</label>
-                            <textarea
+                            <label className="label" htmlFor="people-field-23">Notes</label>
+                            <textarea id="people-field-23"
                               className="input"
                               rows={2}
                               value={anniversaryDraft.notes}

@@ -112,8 +112,8 @@ export default function LoginPage() {
           </p>
           <form onSubmit={onBootstrap} style={{ display: 'grid', gap: '0.75rem' }}>
             <div>
-              <label className="label">Bootstrap secret (same as in Vercel env)</label>
-              <input
+              <label className="label" htmlFor="login-field-1">Bootstrap secret (same as in Vercel env)</label>
+              <input id="login-field-1"
                 className="input"
                 type="password"
                 autoComplete="off"
@@ -123,12 +123,12 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="label">Your name</label>
-              <input className="input" value={bootstrapName} onChange={(e) => setBootstrapName(e.target.value)} required />
+              <label className="label" htmlFor="login-field-2">Your name</label>
+              <input id="login-field-2" className="input" value={bootstrapName} onChange={(e) => setBootstrapName(e.target.value)} required />
             </div>
             <div>
-              <label className="label">Email (login)</label>
-              <input
+              <label className="label" htmlFor="login-field-3">Email (login)</label>
+              <input id="login-field-3"
                 className="input"
                 type="email"
                 autoComplete="email"
@@ -138,8 +138,8 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="label">Password (min. 8 characters)</label>
-              <input
+              <label className="label" htmlFor="login-field-4">Password (min. 8 characters)</label>
+              <input id="login-field-4"
                 className="input"
                 type="password"
                 autoComplete="new-password"
@@ -185,13 +185,14 @@ export default function LoginPage() {
         </div>
         <form onSubmit={onSubmit} style={{ display: 'grid', gap: '1.1rem' }}>
           <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <label className="label" htmlFor="login-email">Email</label>
+            <input id="login-email" className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div>
-            <label className="label">Password</label>
+            <label className="label" htmlFor="login-password">Password</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input
+                id="login-password"
                 className="input"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"

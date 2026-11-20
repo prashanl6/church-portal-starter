@@ -109,7 +109,7 @@ export default function ChurchBankAccountAdminPage() {
         <div className="span-2">
           <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>Propose new details</h2>
           <p className="hint" style={{ marginTop: 0 }}>
-            Account number: <strong>digits only</strong>. Bank and branch: <strong>letters and spaces only</strong>.
+            Account number: <strong>digits only</strong>, no spaces or dashes.
           </p>
         </div>
         <div>

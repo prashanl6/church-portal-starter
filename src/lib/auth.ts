@@ -3,24 +3,33 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { prisma } from './prisma';
 import bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 
 /**
- * JWT signing secret. In production a real secret is mandatory: with the old "dev-secret"
+ * JWT signing secret. Never a guessable constant in production: with the old "dev-secret"
  * fallback anyone could forge an admin login.
+ *
+ * Order: JWT_SECRET if set; otherwise a key derived from DATABASE_URL (already a server-only
+ * secret, and anyone holding it controls the data anyway). Changing either logs everyone out.
  */
 export function getJwtSecret(): string {
   const s = process.env.JWT_SECRET;
   if (s && s.length >= 16 && s !== 'your-secret-key-here') return s;
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET must be set to a long random value in production.');
+    const db = process.env.DATABASE_URL;
+    if (!db) throw new Error('Set JWT_SECRET (or DATABASE_URL) in production.');
+    return createHash('sha256').update(`church-portal-jwt:${db}`).digest('hex');
   }
   return 'dev-secret-only-for-local-development';
 }
 
 export const AUTH_COOKIE_NAME = 'token';
 
-/** Options for auth cookie on NextResponse (HTTPS on Vercel requires secure: true). */
-export function getAuthCookieOptions(): {
+/**
+ * Options for the auth cookie. It is HTTPS-only whenever the site is served over HTTPS
+ * (always on Vercel); a production build tried locally over http://localhost still works.
+ */
+export function getAuthCookieOptions(req?: Request): {
   httpOnly: boolean;
   sameSite: 'lax';
   secure: boolean;
@@ -28,10 +37,15 @@ export function getAuthCookieOptions(): {
   maxAge: number;
 } {
   const isProd = process.env.NODE_ENV === 'production';
+  const proto = req
+    ? req.headers.get('x-forwarded-proto')?.split(',')[0].trim() || new URL(req.url).protocol.replace(':', '')
+    : 'https';
+  const host = req ? (req.headers.get('host') || '').split(':')[0] : '';
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(host);
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: isProd,
+    secure: isProd && !(local && proto === 'http'),
     path: '/',
     maxAge: 60 * 60 * 8, // matches JWT expiresIn
   };

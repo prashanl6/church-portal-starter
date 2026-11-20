@@ -1509,3 +1509,19 @@ nav a {
 
 /* Dialog-like panel for editing */
 .panel-enter { animation: slideIn 0.5s var(--ease) both; }
+
+/* Small count bubble next to the Admin link (changes waiting for approval). */
+.nav-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  vertical-align: middle;
+}

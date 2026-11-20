@@ -67,7 +67,7 @@ Plan **backups** and restore tests.
 
 1. Connect the Git repository and set the **root** to the app root (where `package.json` lives).
 2. Add **all** variables from `.env.example` in the Vercel project **Settings → Environment Variables** (Production and Preview as needed).
-3. Set **`CRON_SECRET`** in production. Vercel Cron (see `vercel.json`) calls `/api/cron/booking-auto-cancel` **once per day at 00:00 UTC**; the route expects `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is set.
+3. Vercel Cron (see `vercel.json`) calls `/api/cron/booking-auto-cancel` **once per day at 00:00 UTC**. If **`CRON_SECRET`** is set, the route requires `Authorization: Bearer <CRON_SECRET>` (Vercel sends it automatically). Without it the job still runs; that is safe because it only cancels bookings already past their payment deadline.
 4. Confirm **`NEXT_PUBLIC_BASE_URL`** and **`BASE_URL`** are your real public `https://` domain.
 5. Add a **PostgreSQL** `DATABASE_URL` (see §2.4). Preview deployments may use a separate database or the same, depending on your workflow.
 
@@ -92,11 +92,11 @@ Booking and other notifications need a working SMTP configuration:
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | **PostgreSQL** connection string for Prisma (often `?schema=public`; hosted DBs may need `?sslmode=require`). |
-| `JWT_SECRET` | Signs auth cookies; use a long random string in production. |
+| `JWT_SECRET` | Signs auth cookies; use a long random string in production. If unset, a key derived from `DATABASE_URL` is used. |
 | `SMTP_*`, `FROM_EMAIL`, `FROM_NAME` | Outbound email. |
 | `NEXT_PUBLIC_BASE_URL` | Public site URL (browser-visible, e.g. links). |
 | `BASE_URL` | Server-side base URL for emails and internal URLs. |
-| `CRON_SECRET` | Protects the booking auto-cancel cron (`Bearer` token). **Required in production** for that job to run. |
+| `CRON_SECRET` | Optional. When set, only callers with this `Bearer` token can run the booking auto-cancel job. |
 | `BOOKING_TIMEZONE` | IANA zone for hall booking times (e.g. `Asia/Colombo`); used for payment-deadline logic. |
 
 Copy `.env.example` and fill in real values; never commit `.env`.

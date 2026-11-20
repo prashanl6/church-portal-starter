@@ -152,126 +152,17 @@ function AdminBookingsPageContent() {
                 )}
                 </dl>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
-                {booking.status === 'REQUESTED' && (
-                  <>
-                    <button
-                      className="btn btn-sm"
-                      onClick={async () => {
-                        if (!window.confirm(`Approve booking request ${booking.bookingRef}?`)) {
-                          return;
-                        }
-                        try {
-                          // Find the approval record for this booking
-                          const approvalRes = await fetch('/api/approvals');
-                          const approvalData = await approvalRes.json();
-                          const approval = approvalData.list?.find((a: any) => 
-                            a.resourceType === 'booking' && 
-                            a.resourceId === booking.id && 
-                            a.status === 'SUBMITTED'
-                          );
-                          
-                          if (!approval) {
-                            alert('Approval record not found. Please use the Approvals Queue.');
-                            return;
-                          }
-                          
-                          const res = await fetch('/api/approvals/approve', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              resourceType: 'booking',
-                              resourceId: booking.id,
-                              comment: 'Approved'
-                            })
-                          });
-                          
-                          if (res.ok) {
-                            alert('Booking approved successfully');
-                            mutate();
-                          } else {
-                            const error = await res.json();
-                            alert(error.error || 'Failed to approve booking');
-                          }
-                        } catch (error) {
-                          alert('Failed to approve booking');
-                        }
-                      }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="btn-secondary btn-sm"
-                      onClick={async () => {
-                        const reason = window.prompt('Please provide a reason for rejection (required):');
-                        if (!reason || reason.trim() === '') {
-                          alert('Rejection reason is required');
-                          return;
-                        }
-                        if (!window.confirm(`Reject booking request ${booking.bookingRef}?`)) {
-                          return;
-                        }
-                        try {
-                          const res = await fetch('/api/approvals/reject', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              resourceType: 'booking',
-                              resourceId: booking.id,
-                              comment: reason.trim()
-                            })
-                          });
-                          
-                          if (res.ok) {
-                            alert('Booking rejected successfully');
-                            mutate();
-                          } else {
-                            const error = await res.json();
-                            alert(error.error || 'Failed to reject booking');
-                          }
-                        } catch (error) {
-                          alert('Failed to reject booking');
-                        }
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </>
+                {/* Every decision is made in one place: the Approvals queue. */}
+                {(booking.status === 'REQUESTED' ||
+                  (booking.status === 'APPROVED_PENDING_PAYMENT' && booking.slipUrl)) && (
+                  <a href="/admin/approvals?filter=SUBMITTED" className="btn btn-sm">
+                    {booking.status === 'REQUESTED' ? 'Review request in Approvals' : 'Check payment in Approvals'}
+                  </a>
                 )}
-                {booking.slipUrl && booking.status === 'APPROVED_PENDING_PAYMENT' && (
-                  <>
-                    <a
-                      href={booking.slipUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-secondary btn-sm"
-                    >
-                      View Receipt
-                    </a>
-                    <button
-                      className="btn btn-sm"
-                      onClick={async () => {
-                        if (!window.confirm('Confirm that payment receipt is valid and mark booking as fully paid?')) {
-                          return;
-                        }
-                        try {
-                          const res = await fetch(`/api/admin/bookings/${booking.id}/confirm-payment`, {
-                            method: 'POST',
-                          });
-                          if (res.ok) {
-                            alert('Payment confirmed successfully');
-                            mutate();
-                          } else {
-                            const error = await res.json();
-                            alert(error.error || 'Failed to confirm payment');
-                          }
-                        } catch (error) {
-                          alert('Failed to confirm payment');
-                        }
-                      }}
-                    >
-                      Confirm Payment
-                    </button>
-                  </>
+                {booking.slipUrl && (
+                  <a href={booking.slipUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
+                    View Receipt
+                  </a>
                 )}
                   <button
                     className="btn-quiet danger"

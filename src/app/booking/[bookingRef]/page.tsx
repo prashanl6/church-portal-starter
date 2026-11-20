@@ -19,6 +19,7 @@ interface Booking {
   amount: number | null;
   paymentRef: string | null;
   slipReceived: boolean;
+  bankAccount: { accountName: string; accountNumber: string; bankName: string; branch: string } | null;
 }
 
 export default function BookingDetailsPage() {
@@ -138,12 +139,12 @@ export default function BookingDetailsPage() {
     REQUESTED: {
       tone: 'info',
       title: 'Your request is with the church office',
-      text: 'An administrator will review it. You will get an email when it is approved, with the amount to pay.',
+      text: 'An administrator will review it. Come back to this page: once it is approved, the amount and how to pay will appear here.',
     },
     APPROVED_PENDING_PAYMENT: {
       tone: 'warning',
       title: 'Approved — please pay to confirm',
-      text: 'Pay the amount below using the bank details in your approval email, then upload your payment slip on this page.',
+      text: 'Pay the amount below into the church bank account shown here, then upload your payment slip on this page.',
     },
     BOOKED_PAID: {
       tone: 'success',
@@ -182,7 +183,7 @@ export default function BookingDetailsPage() {
               {showSlipDone ? 'Payment slip received' : step.title}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '1.1rem' }}>
-              {showSlipDone ? 'The church office will check your slip and email you once your booking is confirmed.' : step.text}
+              {showSlipDone ? 'The church office will check your slip. This page will then show “Booking confirmed”.' : step.text}
             </p>
           </div>
         )}
@@ -194,6 +195,18 @@ export default function BookingDetailsPage() {
             </div>
           </div>
         ) : null}
+        {booking.status === 'APPROVED_PENDING_PAYMENT' && !showSlipDone && (
+          booking.bankAccount ? (
+            <dl className="details" aria-label="Church bank account">
+              <div><dt>Account name</dt><dd>{booking.bankAccount.accountName}</dd></div>
+              <div><dt>Account number</dt><dd>{booking.bankAccount.accountNumber}</dd></div>
+              <div><dt>Bank</dt><dd>{booking.bankAccount.bankName}</dd></div>
+              <div><dt>Branch</dt><dd>{booking.bankAccount.branch}</dd></div>
+            </dl>
+          ) : (
+            <p className="hint" style={{ margin: 0 }}>Please contact the church office for the bank account details.</p>
+          )
+        )}
       </div>
 
       <div className="card">

@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth';
 
 // Default categories
-const DEFAULT_CATEGORIES = ['Furniture', 'Sound Equipment', 'AV Equipment', 'Cutlery and Dishware'];
+// Where an item belongs or what kind it is (requirement: label category such as Chapel or Hall).
+const DEFAULT_CATEGORIES = ['Chapel', 'Main Hall', 'Furniture', 'Sound Equipment', 'AV Equipment', 'Cutlery and Dishware', 'Medical Equipment'];
 
 export async function GET() {
   const u = requireRole(['admin', 'staff']);

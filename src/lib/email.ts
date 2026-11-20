@@ -13,6 +13,19 @@ const transporter = nodemailer.createTransport({
 });
 
 const FROM_EMAIL = process.env.FROM_EMAIL || process.env.SMTP_USER || '';
+
+/** True when an email account is configured. Without one, emails are skipped quickly instead of timing out. */
+export function emailConfigured(): boolean {
+  return Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
+async function send(message: Parameters<typeof transporter.sendMail>[0]) {
+  if (!emailConfigured()) {
+    console.warn(`Email not sent (SMTP_USER/SMTP_PASS not set): ${message.subject}`);
+    return;
+  }
+  await transporter.sendMail(message);
+}
 const FROM_NAME = process.env.FROM_NAME || 'Church Portal';
 
 function escapeHtml(s: string): string {
@@ -88,7 +101,7 @@ export async function sendBookingSubmissionEmail(booking: BookingDetails) {
   `;
 
   try {
-    await transporter.sendMail({
+    await send({
       from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
       to: booking.email,
       subject: `Booking Request Submitted - ${booking.bookingRef}`,
@@ -177,7 +190,7 @@ export async function sendBookingApprovalEmail(booking: BookingDetails, baseUrl:
   `;
 
   try {
-    await transporter.sendMail({
+    await send({
       from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
       to: booking.email,
       subject: `Booking Approved - ${booking.bookingRef}`,
@@ -246,7 +259,7 @@ export async function sendBookingRejectionEmail(booking: BookingDetails, rejectR
   `;
 
   try {
-    await transporter.sendMail({
+    await send({
       from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
       to: booking.email,
       subject: `Booking Request Rejected - ${booking.bookingRef}`,
@@ -312,7 +325,7 @@ export async function sendBookingPaymentConfirmedEmail(booking: BookingDetails) 
   `;
 
   try {
-    await transporter.sendMail({
+    await send({
       from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
       to: booking.email,
       subject: `Booking Confirmed - ${booking.bookingRef}`,
@@ -377,7 +390,7 @@ export async function sendBookingAutoCancelledEmail(booking: BookingDetails) {
   `;
 
   try {
-    await transporter.sendMail({
+    await send({
       from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
       to: booking.email,
       subject: `Booking automatically cancelled - ${booking.bookingRef}`,

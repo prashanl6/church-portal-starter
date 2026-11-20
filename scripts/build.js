@@ -5,6 +5,8 @@
  * Vercel preview builds (VERCEL_ENV=preview or development) skip them and just compile,
  * which means a half-finished branch can never alter the live database.
  *
+ * Production builds also add any missing reference data (scripts/seed-reference-data.js).
+ *
  * Local and non-Vercel builds (no VERCEL_ENV) behave as before and run migrations.
  * Set SKIP_DB_MIGRATIONS=1 to skip them anywhere.
  */
@@ -13,6 +15,19 @@ const { execSync } = require('child_process');
 function run(cmd) {
   console.log(`\n> ${cmd}`);
   execSync(cmd, { stdio: 'inherit' });
+}
+
+/** A sleeping hosted database (e.g. Neon) can take a while to wake, so retry a few times. */
+function runWithRetry(cmd, attempts = 4, waitSeconds = 15) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return run(cmd);
+    } catch (e) {
+      if (i === attempts) throw e;
+      console.log(`Attempt ${i} failed; waiting ${waitSeconds}s for the database to wake up…`);
+      execSync(`sleep ${waitSeconds}`);
+    }
+  }
 }
 
 const vercelEnv = process.env.VERCEL_ENV;
@@ -25,13 +40,15 @@ if (skipMigrations) {
       'Only production builds change the database.'
   );
 } else {
-  run('npx prisma migrate deploy');
+  runWithRetry('npx prisma migrate deploy');
 }
 
 run('npx prisma generate');
 
 if (!skipMigrations) {
   run('node scripts/migrate-legacy-people-event.js');
+  // Adds missing reference data (hall rate, process guides, welcome notice); never overwrites.
+  run('node scripts/seed-reference-data.js');
 }
 
 run('npx next build');
