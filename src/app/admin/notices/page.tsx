@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import RichTextEditor from '@/components/RichTextEditor';
+import { PageHeader, ADMIN_BACK } from '@/components/ui';
 
 export default function NoticesAdminPage() {
   const [form, setForm] = useState({
@@ -38,29 +39,38 @@ export default function NoticesAdminPage() {
   };
 
   return (
-    <div className="grid gap-4">
-      <h1 className="text-2xl font-semibold">Manage Notices</h1>
-      <form onSubmit={submit} className="card grid gap-4">
+    <div className="page">
+      <PageHeader
+        back={ADMIN_BACK}
+        eyebrow="Notices"
+        title="Write a notice"
+        subtitle="When you submit, a second administrator checks the notice before it appears on the website."
+      />
+      <form onSubmit={submit} className="card panel-enter form-grid two">
         <div>
-          <label className="label">Title</label>
+          <label className="label" htmlFor="notice-title">Title</label>
           <input
+            id="notice-title"
             className="input"
             type="text"
             placeholder="Notice title"
             value={form.title}
             onChange={e => setForm({ ...form, title: e.target.value })}
           />
+          <p className="hint">A short heading, for example “Harvest Festival this Sunday”.</p>
         </div>
         <div>
-          <label className="label">Week Of</label>
+          <label className="label" htmlFor="notice-week">Week Of</label>
           <input
+            id="notice-week"
             className="input"
             type="date"
             value={form.weekOf}
             onChange={e => setForm({ ...form, weekOf: e.target.value })}
           />
+          <p className="hint">The week this notice is for.</p>
         </div>
-        <div>
+        <div className="span-2">
           <label className="label">Body Content</label>
           <RichTextEditor
             value={form.bodyHtml}
@@ -68,7 +78,9 @@ export default function NoticesAdminPage() {
             placeholder="Enter notice content. Use the toolbar to format text with bold, italic, underline, colors, and more..."
           />
         </div>
-        <button className="btn w-fit">Submit for Approval</button>
+        <div className="span-2">
+          <button className="btn">Submit for Approval</button>
+        </div>
       </form>
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from 'react';
+import { PageHeader, ADMIN_BACK, Alert } from '@/components/ui';
 
 export default function AdminSermonsPage() {
   const [title, setTitle] = useState('');
@@ -118,42 +119,57 @@ export default function AdminSermonsPage() {
     } finally { setLoading(false); }
   }
 
+  const reset = () => { setTitle(''); setSpeaker(''); setTheme(''); setLink(''); setWeekOf(''); setMsg(''); };
+
   return (
-    <div className="grid gap-4">
-      <h1 className="text-2xl font-semibold">Admin — Sermons</h1>
-      <form onSubmit={handleSubmit} className="grid gap-3 max-w-lg">
-        <label className="flex flex-col"><span>Title</span><input className="input" value={title} onChange={e => setTitle(e.target.value)} /></label>
-        <label className="flex flex-col"><span>Speaker</span><input className="input" value={speaker} onChange={e => setSpeaker(e.target.value)} /></label>
-        <label className="flex flex-col"><span>Theme</span><input className="input" value={theme} onChange={e => setTheme(e.target.value)} /></label>
-        <label className="flex flex-col"><span>Facebook Link</span><input className="input" value={link} onChange={e => setLink(e.target.value)} placeholder="https://www.facebook.com/..." /></label>
-        <label className="flex flex-col"><span>Week Of (past Sundays only)</span>
-          <select className="input" value={weekOf} onChange={e => setWeekOf(e.target.value)}>
+    <div className="page">
+      <PageHeader
+        back={ADMIN_BACK}
+        eyebrow="Sermons"
+        title="Add a sermon"
+        subtitle="When you submit, a second administrator checks the sermon before it appears on the website."
+      />
+      <form onSubmit={handleSubmit} className="card panel-enter form-grid two">
+        <div>
+          <label className="label" htmlFor="s-title">Title</label>
+          <input id="s-title" className="input" value={title} onChange={e => setTitle(e.target.value)} />
+        </div>
+        <div>
+          <label className="label" htmlFor="s-speaker">Speaker</label>
+          <input id="s-speaker" className="input" value={speaker} onChange={e => setSpeaker(e.target.value)} />
+        </div>
+        <div>
+          <label className="label" htmlFor="s-theme">Theme</label>
+          <input id="s-theme" className="input" value={theme} onChange={e => setTheme(e.target.value)} />
+          <p className="hint">Optional.</p>
+        </div>
+        <div>
+          <label className="label" htmlFor="s-week">Week Of (past Sundays only)</label>
+          <select id="s-week" className="input" value={weekOf} onChange={e => setWeekOf(e.target.value)}>
             <option value="">Select a Sunday</option>
             {sundays.map(d => {
               // Parse the date string and create a date in local timezone
               const date = new Date(d + 'T00:00:00');
-              const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-              const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+              const dayName = date.toLocaleDateString('en-GB', { weekday: 'long' });
+              const dateStr = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
               return (
                 <option key={d} value={d}>{dayName}, {dateStr}</option>
               );
             })}
           </select>
-        </label>
-        <div className="flex gap-2">
+        </div>
+        <div className="span-2">
+          <label className="label" htmlFor="s-link">Facebook Link</label>
+          <input id="s-link" className="input" value={link} onChange={e => setLink(e.target.value)} placeholder="https://www.facebook.com/..." />
+          <p className="hint">Open the video on Facebook, copy the address from the browser bar and paste it here.</p>
+        </div>
+        <div className="span-2" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
           <button className="btn" type="submit" disabled={loading}>{loading ? 'Submitting...' : 'Submit for Approval'}</button>
-          <button type="button" className="btn-secondary" onClick={() => { setTitle(''); setSpeaker(''); setTheme(''); setLink(''); setWeekOf(''); setMsg(''); }}>Reset</button>
+          <button type="button" className="btn-secondary" onClick={reset}>Reset</button>
         </div>
         {msg && (
-          <div style={{
-            padding: '0.75rem 1rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            backgroundColor: msg.includes('submitted') ? 'rgb(220, 252, 231)' : msg.includes('expired') || msg.includes('log in') ? 'rgb(254, 242, 242)' : 'rgb(254, 242, 242)',
-            color: msg.includes('submitted') ? 'rgb(22, 101, 52)' : 'rgb(153, 27, 27)',
-            border: `1px solid ${msg.includes('submitted') ? 'rgb(187, 247, 208)' : 'rgb(254, 205, 211)'}`
-          }}>
-            {msg}
+          <div className="span-2">
+            <Alert tone={msg.includes('submitted') ? 'success' : 'error'}>{msg}</Alert>
           </div>
         )}
       </form>

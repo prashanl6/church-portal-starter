@@ -1,5 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Reveal from '@/components/Reveal';
+import { IconSermon } from '@/components/Icons';
+import { EmptyState, PageHeader, SkeletonList, longDate } from '@/components/ui';
 
 const RATER_STORAGE_KEY = 'sermon-rater-client-id';
 
@@ -37,7 +40,7 @@ function StarRatingRow({
     <div
       role="group"
       aria-label="Rate this sermon from 1 to 5 stars"
-      style={{ display: 'flex', gap: '0.15rem', alignItems: 'center', flexWrap: 'wrap' }}
+      style={{ display: 'flex', gap: '0.1rem', alignItems: 'center', flexWrap: 'wrap' }}
     >
       {[1, 2, 3, 4, 5].map((n) => {
         const filled = yourStars != null && n <= yourStars;
@@ -50,17 +53,24 @@ function StarRatingRow({
             aria-pressed={filled}
             onClick={() => onRate(n)}
             style={{
-              padding: '0.15rem 0.25rem',
-              fontSize: '1.25rem',
-              lineHeight: 1,
+              width: 44,
+              height: 44,
+              display: 'grid',
+              placeItems: 'center',
+              padding: 0,
               border: 'none',
+              borderRadius: 12,
               background: 'transparent',
               cursor: disabled ? 'not-allowed' : 'pointer',
-              color: filled ? 'rgb(234, 179, 8)' : 'rgb(203, 213, 225)',
-              opacity: disabled ? 0.6 : 1
+              color: filled ? '#d4a017' : '#cfccc4',
+              opacity: disabled ? 0.6 : 1,
+              transition: 'transform var(--dur-1) var(--ease), color var(--dur-1)'
             }}
           >
-            {filled ? '\u2605' : '\u2606'}
+            <svg width={26} height={26} viewBox="0 0 24 24" aria-hidden="true"
+              fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round">
+              <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z" />
+            </svg>
           </button>
         );
       })}
@@ -190,26 +200,9 @@ export default function SermonsPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh' }}>
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{
-            height: '2.5rem',
-            backgroundColor: 'rgb(226, 232, 240)',
-            borderRadius: '0.5rem',
-            width: '12rem',
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-          }}></div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} style={{
-              height: '5rem',
-              backgroundColor: 'rgb(241, 245, 249)',
-              borderRadius: '0.5rem',
-              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-            }}></div>
-          ))}
-        </div>
+      <div className="page">
+        <PageHeader title="Sermons" subtitle="Watch or listen again to messages from our services." />
+        <SkeletonList rows={4} height={150} />
       </div>
     );
   }
@@ -227,130 +220,98 @@ export default function SermonsPage() {
   };
 
   return (
-    <div style={{ display: 'grid', gap: '2rem' }}>
-      <div>
-        <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>Sermons</h1>
-        <p className="page-subtitle" style={{ marginBottom: 0 }}>
-          Watch and listen to inspiring messages from our services
-        </p>
-      </div>
-      <div style={{ display: 'grid', gap: '1rem' }}>
-        {sermons.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎤</div>
-            <p style={{ color: 'rgb(100, 116, 139)', fontSize: '1.125rem', margin: 0 }}>
-              No sermons available yet
-            </p>
-          </div>
-        ) : (
-          sermons.map((s, index) => {
+    <div className="page">
+      <PageHeader title="Sermons" subtitle="Watch or listen again to messages from our services." />
+      {sermons.length === 0 ? (
+        <EmptyState
+          icon={<IconSermon />}
+          title="No sermons yet"
+          text="Recordings appear here after each service. Please check again later."
+        />
+      ) : (
+        <div className="stack">
+          {sermons.map((s, index) => {
             const theme = getTheme(s);
             return (
-              <div 
-                key={s.id} 
-                className="card" 
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  gap: '1.5rem',
-                  animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: 600, 
-                    color: 'rgb(15, 23, 42)',
-                    marginBottom: '0.5rem'
-                  }}>
-                    {s.title}
+              <Reveal key={s.id} delay={Math.min(index, 4) * 70}>
+                <div className="card" style={{ display: 'grid', gap: '1.25rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem 1.5rem', alignItems: 'flex-start' }}>
+                    <span
+                      className="tile-icon"
+                      style={{ background: '#efeaf6', color: '#6a5a9e', marginBottom: 0, flexShrink: 0 }}
+                    >
+                      <IconSermon />
+                    </span>
+                    <div style={{ flex: '1 1 16rem', minWidth: 0 }}>
+                      <span className="eyebrow" style={{ marginBottom: '0.35rem' }}>{longDate(s.date)}</span>
+                      <h2 className="tile-title" style={{ fontSize: '1.45rem' }}>{s.title}</h2>
+                      <p style={{ margin: '0.35rem 0 0', color: 'var(--text-2)', fontSize: '1.08rem' }}>
+                        {s.speaker}
+                        {theme ? ` · ${theme}` : ''}
+                      </p>
+                    </div>
+                    <a
+                      className="btn"
+                      href={s.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" />
+                      </svg>
+                      Watch
+                    </a>
                   </div>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    color: 'rgb(71, 85, 105)',
-                    marginBottom: '0.25rem'
-                  }}>
-                    {s.speaker}{theme ? ` — ${theme}` : ''}
-                  </div>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    color: 'rgb(100, 116, 139)',
-                    marginBottom: '0.5rem'
-                  }}>
-                    {new Date(s.date).toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </div>
+
                   <div
                     style={{
-                      marginTop: '0.75rem',
+                      borderTop: '1px solid var(--line)',
+                      paddingTop: '1rem',
                       display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: 'rgb(100, 116, 139)'
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem 1.5rem'
                     }}
                   >
-                    <div>
-                      {s.ratingCount === 0 ? (
-                        <span>No ratings yet</span>
-                      ) : (
-                        <span>
-                          <strong style={{ color: 'rgb(15, 23, 42)' }}>{s.averageRating}</strong> / 5 average ·{' '}
-                          {s.ratingCount} rating{s.ratingCount !== 1 ? 's' : ''}
-                        </span>
-                      )}
+                    <div style={{ display: 'grid', gap: '0.15rem' }}>
+                      <span style={{ fontWeight: 600 }}>
+                        {s.yourStars != null ? `Your rating: ${s.yourStars} of 5` : 'How helpful was this sermon?'}
+                      </span>
+                      <span style={{ color: 'var(--text-3)', fontSize: '0.98rem' }}>
+                        {s.ratingCount === 0 ? (
+                          'No ratings yet'
+                        ) : (
+                          <>
+                            Average {s.averageRating} / 5 from {s.ratingCount} rating{s.ratingCount !== 1 ? 's' : ''}
+                          </>
+                        )}
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-                      <StarRatingRow
-                        yourStars={s.yourStars}
-                        disabled={ratingBusyId === s.id}
-                        onRate={(n) => submitRating(s.id, n)}
-                      />
-                      {s.yourStars != null && (
-                        <span style={{ fontSize: '0.8125rem' }}>Your rating: {s.yourStars}</span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '0.75rem', color: 'rgb(148, 163, 184)' }}>
-                      One rating per device; you can change your stars anytime.
+                    <StarRatingRow
+                      yourStars={s.yourStars}
+                      disabled={ratingBusyId === s.id}
+                      onRate={(n) => submitRating(s.id, n)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="hint" style={{ margin: 0 }}>
+                      One rating per device. You can change your stars at any time.
                     </span>
+                    {isAdmin && (
+                      <button type="button" className="btn-quiet danger" onClick={() => handleDelete(s.id, s.title)}>
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <a 
-                    className="btn btn-primary" 
-                    href={s.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{ textDecoration: 'none', flexShrink: 0 }}
-                  >
-                    ▶ Watch
-                  </a>
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleDelete(s.id, s.title)}
-                      className="btn btn-delete"
-                      style={{ 
-                        padding: '0.5rem 1rem', 
-                        fontSize: '0.875rem',
-                        flexShrink: 0,
-                        border: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
+              </Reveal>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }

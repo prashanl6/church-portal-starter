@@ -1,6 +1,10 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { computeHallBookingCharge } from '@/lib/hallBookingPricing';
+import { PageHeader, Alert, DateChip, longDate } from '@/components/ui';
+import { IconCalendar } from '@/components/Icons';
+
+const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function BookHallPage() {
   const [form, setForm] = useState({
@@ -77,231 +81,153 @@ export default function BookHallPage() {
     }
   };
 
+  const upcoming = booked.filter((b) => new Date(b.date) >= new Date());
+  const submitted = msg.includes('submitted');
+
   return (
-    <div style={{ display: 'grid', gap: '2rem' }}>
-      <div>
-        <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>
-          Book the Hall
-        </h1>
-        <p className="page-subtitle" style={{ marginBottom: 0 }}>
-          Reserve the hall or chapel for your events and gatherings
-        </p>
-      </div>
-      <div className="card">
-        <h2
-          style={{
-            fontSize: '1.25rem',
-            fontWeight: 600,
-            marginBottom: '1rem',
-            color: 'rgb(15, 23, 42)'
-          }}
-        >
-          {'\u{1F4C5}'} Availability (booked dates)
-        </h2>
-        {booked.length === 0 ? (
-          <p style={{ color: 'rgb(100, 116, 139)', margin: 0 }}>No confirmed bookings scheduled</p>
-        ) : (
-          <ul
+    <div className="page">
+      <PageHeader
+        eyebrow="Main Hall and Chapel"
+        title="Book the hall"
+        subtitle="Send a request for the Main Hall or Chapel. An administrator will reply by email once it is approved."
+      />
+
+      <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 22rem), 1fr))', alignItems: 'start' }}>
+        <form onSubmit={submit} className="card stack" style={{ gap: '1.75rem', gridColumn: 'span 1' }}>
+          <Alert tone="info">
+            The hall can be booked between <strong>8:00 a.m. and 10:00 p.m.</strong> Hire is charged in{' '}
+            <strong>30-minute blocks</strong>; part of a block counts as a full block.
+          </Alert>
+
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }} className="stack">
+            <legend className="section-label">1. Your details</legend>
+            <div className="form-grid two">
+              <div className="span-2">
+                <label className="label" htmlFor="bk-name">Full Name</label>
+                <input id="bk-name" className="input" autoComplete="name" value={form.fullName}
+                  onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+              </div>
+              <div>
+                <label className="label" htmlFor="bk-email">Email</label>
+                <input id="bk-email" type="email" className="input" autoComplete="email" value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <p className="hint">We send your approval and payment details here.</p>
+              </div>
+              <div>
+                <label className="label" htmlFor="bk-phone">Phone</label>
+                <input id="bk-phone" type="tel" className="input" autoComplete="tel" value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div className="span-2">
+                <label className="label" htmlFor="bk-purpose">Purpose</label>
+                <input id="bk-purpose" className="input" placeholder="For example: birthday lunch, choir practice" value={form.purpose}
+                  onChange={(e) => setForm({ ...form, purpose: e.target.value })} required />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }} className="stack">
+            <legend className="section-label">2. Date and time</legend>
+            <div className="form-grid two">
+              <div className="span-2">
+                <label className="label" htmlFor="bk-date">Date</label>
+                <input id="bk-date" type="date" className="input" value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                {form.date && <p className="hint">{longDate(form.date + 'T00:00:00')}</p>}
+              </div>
+              <div>
+                <label className="label" htmlFor="bk-start">Start Time</label>
+                <input id="bk-start" type="time" className="input" min="08:00" max="22:00" value={form.startTime}
+                  onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+              </div>
+              <div>
+                <label className="label" htmlFor="bk-end">End Time</label>
+                <input id="bk-end" type="time" className="input" min="08:00" max="22:00" value={form.endTime}
+                  onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }} className="stack">
+            <legend className="section-label">3. Hall</legend>
+            <div>
+              <label className="label" htmlFor="bk-hall">Hall</label>
+              <select id="bk-hall" className="input" value={form.hall} onChange={(e) => setForm({ ...form, hall: e.target.value })}>
+                <option>Main Hall</option>
+                <option>Chapel</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <div
             style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem'
+              padding: '1.25rem 1.4rem',
+              borderRadius: 'var(--radius)',
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
             }}
+            aria-live="polite"
           >
-            {booked
-              .filter((b) => {
-                const bookingDate = new Date(b.date);
-                return bookingDate >= new Date();
-              })
-              .map((b, i) => (
-                <li
-                  key={i}
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: 'rgb(248, 250, 252)',
-                    borderRadius: '0.5rem',
-                    border: '1px solid rgb(226, 232, 240)'
-                  }}
-                >
-                  <span style={{ fontWeight: 500 }}>
-                    {new Date(b.date).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </span>
-                  <span style={{ color: 'rgb(71, 85, 105)', marginLeft: '0.5rem' }}>
-                    {b.startTime} - {b.endTime}
-                  </span>
-                  {b.hall && (
-                    <span style={{ color: 'rgb(100, 116, 139)', marginLeft: '0.5rem', fontSize: '0.875rem' }}>
-                      ({b.hall})
-                    </span>
-                  )}
+            <div style={{ color: 'var(--text-2)', fontWeight: 600, marginBottom: '0.35rem' }}>Estimated hall hire</div>
+            {ratePer30Minutes <= 0 ? (
+              <p style={{ margin: 0, color: 'var(--text-2)' }}>
+                The church has not set a rate yet. You can still send your request; an administrator will confirm any fees.
+              </p>
+            ) : !form.startTime || !form.endTime ? (
+              <p style={{ margin: 0, color: 'var(--text-2)' }}>Choose a start and end time to see the total.</p>
+            ) : !quote.ok ? (
+              <p style={{ margin: 0, color: 'var(--danger)' }}>{quote.error}</p>
+            ) : (
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.1rem', fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--text)' }}>
+                  LKR {money(quote.total)}
+                </div>
+                <div style={{ marginTop: '0.25rem', color: 'var(--text-2)' }}>
+                  {quote.slots} block{quote.slots !== 1 ? 's' : ''} of 30 minutes × LKR {money(ratePer30Minutes)}
+                </div>
+              </div>
+            )}
+            <p className="hint" style={{ marginBottom: 0 }}>This is an estimate until your booking is approved.</p>
+          </div>
+
+          <div className="stack-sm">
+            <button className="btn btn-primary" style={{ width: '100%' }}>
+              Submit Request
+            </button>
+            {msg && <Alert tone={submitted ? 'success' : 'error'}>{msg}</Alert>}
+          </div>
+        </form>
+
+        <aside className="card" style={{ position: 'sticky', top: '6rem' }}>
+          <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>Already booked</h2>
+          <p style={{ margin: '0 0 1.25rem', color: 'var(--text-2)' }}>
+            Please choose a time that does not overlap these bookings.
+          </p>
+          {upcoming.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', color: 'var(--text-2)' }}>
+              <span className="tile-icon" style={{ background: 'var(--success-soft)', color: '#2f6b47', marginBottom: 0 }}>
+                <IconCalendar />
+              </span>
+              No upcoming bookings. Every date is free.
+            </div>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.9rem' }}>
+              {upcoming.map((b, i) => (
+                <li key={i} style={{ display: 'flex', gap: '0.9rem', alignItems: 'center' }}>
+                  <DateChip date={b.date} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{longDate(b.date)}</div>
+                    <div style={{ color: 'var(--text-2)' }}>
+                      {b.startTime} – {b.endTime}
+                      {b.hall ? ` · ${b.hall}` : ''}
+                    </div>
+                  </div>
                 </li>
               ))}
-          </ul>
-        )}
+            </ul>
+          )}
+        </aside>
       </div>
-      <form onSubmit={submit} className="card" style={{ display: 'grid', gap: '1.5rem' }}>
-        <h2
-          style={{
-            fontSize: '1.25rem',
-            fontWeight: 600,
-            marginBottom: '0.5rem',
-            color: 'rgb(15, 23, 42)'
-          }}
-        >
-          {'\u{1F4DD}'} Booking Request
-        </h2>
-        <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(71, 85, 105)' }}>
-          Bookings are only for <strong>8:00 a.m. – 10:00 p.m.</strong> Hall hire is calculated in{' '}
-          <strong>30-minute blocks</strong> from your start and end time (any partial block counts as a full block). The
-          total below is an estimate until your booking is approved.
-        </p>
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <label className="label">Full Name</label>
-            <input
-              className="input"
-              value={form.fullName}
-              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-            />
-          </div>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <label className="label">Email</label>
-            <input
-              type="email"
-              className="input"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-          </div>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <label className="label">Phone</label>
-            <input
-              type="tel"
-              className="input"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            />
-          </div>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <label className="label">Purpose</label>
-            <input
-              className="input"
-              value={form.purpose}
-              onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-              required
-            />
-          </div>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <label className="label">Hall</label>
-            <select className="input" value={form.hall} onChange={(e) => setForm({ ...form, hall: e.target.value })}>
-              <option>Main Hall</option>
-              <option>Chapel</option>
-            </select>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              <label className="label">Date</label>
-              <input
-                type="date"
-                className="input"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-              />
-            </div>
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              <label className="label">Start Time</label>
-              <input
-                type="time"
-                className="input"
-                min="08:00"
-                max="22:00"
-                value={form.startTime}
-                onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-              />
-            </div>
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              <label className="label">End Time</label>
-              <input
-                type="time"
-                className="input"
-                min="08:00"
-                max="22:00"
-                value={form.endTime}
-                onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
-        <div
-          style={{
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            backgroundColor: 'rgb(241, 245, 249)',
-            border: '1px solid rgb(226, 232, 240)'
-          }}
-        >
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'rgb(15, 23, 42)', marginBottom: '0.35rem' }}>
-            Estimated hall hire
-          </div>
-          {ratePer30Minutes <= 0 ? (
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(100, 116, 139)' }}>
-              The church has not set a per-30-minute rate yet. Your request can still be submitted; an administrator
-              will confirm any fees.
-            </p>
-          ) : !form.startTime || !form.endTime ? (
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(100, 116, 139)' }}>
-              Choose start and end times to see the total.
-            </p>
-          ) : !quote.ok ? (
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'rgb(153, 27, 27)' }}>{quote.error}</p>
-          ) : (
-            <div style={{ fontSize: '0.875rem', color: 'rgb(30, 41, 59)' }}>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'rgb(15, 23, 42)' }}>
-                LKR{' '}
-                {quote.total.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-              </div>
-              <div style={{ marginTop: '0.35rem', color: 'rgb(71, 85, 105)' }}>
-                {quote.slots} block{quote.slots !== 1 ? 's' : ''} × LKR{' '}
-                {ratePer30Minutes.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}{' '}
-                (30 min each)
-              </div>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <button className="btn btn-primary" style={{ width: 'fit-content' }}>
-            Submit Request
-          </button>
-          {msg && (
-            <p
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '0.5rem',
-                backgroundColor: msg.includes('submitted') ? 'rgb(220, 252, 231)' : 'rgb(254, 226, 226)',
-                color: msg.includes('submitted') ? 'rgb(22, 101, 52)' : 'rgb(153, 27, 27)',
-                margin: 0,
-                fontSize: '0.875rem'
-              }}
-            >
-              {msg}
-            </p>
-          )}
-        </div>
-      </form>
     </div>
   );
 }

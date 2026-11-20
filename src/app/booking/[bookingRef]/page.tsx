@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { PageHeader, Alert, SkeletonList, StatusBadge, EmptyState, longDate } from '@/components/ui';
+import { IconCalendar } from '@/components/Icons';
 
 interface Booking {
   id: number;
@@ -112,222 +114,151 @@ export default function BookingDetailsPage() {
 
   if (loading) {
     return (
-      <div className="container" style={{ paddingTop: '2rem' }}>
-        <div style={{ textAlign: 'center' }}>Loading...</div>
+      <div className="page" style={{ maxWidth: '44rem', margin: '0 auto' }}>
+        <div className="skeleton" style={{ height: 56, width: '60%' }} />
+        <SkeletonList rows={3} height={96} />
       </div>
     );
   }
 
   if (!booking) {
     return (
-      <div className="container" style={{ paddingTop: '2rem' }}>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h1>Booking Not Found</h1>
-          <p>The booking you're looking for doesn't exist.</p>
-        </div>
+      <div className="page" style={{ maxWidth: '44rem', margin: '0 auto' }}>
+        <EmptyState
+          icon={<IconCalendar />}
+          title="Booking not found"
+          text="We could not find a booking with this reference. Please check the link in your email, or contact the church office."
+          action={<a className="btn-secondary" href="/book-hall">Go to hall bookings</a>}
+        />
       </div>
     );
   }
 
-  const bookingDate = new Date(booking.date).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  const statusColors: { [key: string]: string } = {
-    REQUESTED: 'rgb(251, 191, 36)',
-    APPROVED_PENDING_PAYMENT: 'rgb(59, 130, 246)',
-    BOOKED_PAID: 'rgb(34, 197, 94)',
-    REJECTED: 'rgb(239, 68, 68)',
-    AUTO_CANCELLED: 'rgb(194, 65, 12)',
+  const NEXT_STEP: Record<string, { tone: 'info' | 'success' | 'warning' | 'error'; title: string; text: string }> = {
+    REQUESTED: {
+      tone: 'info',
+      title: 'Your request is with the church office',
+      text: 'An administrator will review it. You will get an email when it is approved, with the amount to pay.',
+    },
+    APPROVED_PENDING_PAYMENT: {
+      tone: 'warning',
+      title: 'Approved — please pay to confirm',
+      text: 'Pay the amount below using the bank details in your approval email, then upload your payment slip on this page.',
+    },
+    BOOKED_PAID: {
+      tone: 'success',
+      title: 'Booking confirmed',
+      text: 'Your payment has been confirmed. Your booking is fully paid and confirmed.',
+    },
+    REJECTED: {
+      tone: 'error',
+      title: 'Booking rejected',
+      text: 'This booking request has been rejected. Please contact us if you have any questions.',
+    },
+    AUTO_CANCELLED: {
+      tone: 'error',
+      title: 'Booking automatically cancelled',
+      text: 'This booking was cancelled automatically because payment was not fully confirmed at least one hour before the scheduled start time. The time slot has been released. Please contact us if you need help or wish to book again.',
+    },
   };
+  const step = NEXT_STEP[booking.status];
+  const showSlipDone = booking.slipReceived && booking.status === 'APPROVED_PENDING_PAYMENT';
 
   return (
-    <div className="container" style={{ paddingTop: '2rem', paddingBottom: '6rem' }}>
-      <div className="card">
-        <h1 className="page-title" style={{ marginBottom: '1rem' }}>
-          Booking Details
-        </h1>
+    <div className="page" style={{ maxWidth: '44rem', margin: '0 auto' }}>
+      <PageHeader
+        eyebrow={`Booking ${booking.bookingRef}`}
+        title="Your hall booking"
+        subtitle={`${booking.hall} · ${longDate(booking.date)}`}
+      />
 
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{ 
-            display: 'inline-block', 
-            padding: '0.5rem 1rem', 
-            borderRadius: '0.5rem',
-            backgroundColor: statusColors[booking.status] || 'rgb(100, 116, 139)',
-            color: 'white',
-            fontWeight: 600,
-            marginBottom: '1rem'
-          }}>
-            {booking.status.replace(/_/g, ' ')}
-          </div>
-
-          <div style={{ display: 'grid', gap: '1rem', marginTop: '1.5rem' }}>
-            <div>
-              <strong>Booking Reference:</strong> {booking.bookingRef}
-            </div>
-            <div>
-              <strong>Hall:</strong> {booking.hall}
-            </div>
-            <div>
-              <strong>Date:</strong> {bookingDate}
-            </div>
-            <div>
-              <strong>Time:</strong> {booking.startTime} - {booking.endTime}
-            </div>
-            <div>
-              <strong>Purpose:</strong> {booking.purpose}
-            </div>
-            <div>
-              <strong>Requester:</strong> {booking.requesterName}
-            </div>
-            <div>
-              <strong>Email:</strong> {booking.email}
-            </div>
-            <div>
-              <strong>Phone:</strong> {booking.phone}
-            </div>
-            {booking.amount && (
-              <div>
-                <strong>Amount to Pay:</strong> LKR {booking.amount.toLocaleString()}
-              </div>
-            )}
-            {booking.paymentRef && (
-              <div>
-                <strong>Payment Reference:</strong> {booking.paymentRef}
-              </div>
-            )}
-            {booking.slipReceived && (
-              <div>
-                <strong>Payment slip:</strong> Received ✓ — the church office will check it and email you.
-              </div>
-            )}
-          </div>
+      <div className="card stack" style={{ gap: '1.1rem' }}>
+        <div>
+          <StatusBadge status={booking.status} />
         </div>
-
-        {booking.status === 'APPROVED_PENDING_PAYMENT' && (
-          <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid rgb(226, 232, 240)' }}>
-            <h2 style={{ marginBottom: '1rem' }}>Upload Payment Receipt</h2>
-            
-            {error && (
-              <div style={{ 
-                padding: '1rem', 
-                backgroundColor: 'rgb(254, 242, 242)', 
-                color: 'rgb(220, 38, 38)', 
-                borderRadius: '0.5rem',
-                marginBottom: '1rem'
-              }}>
-                {error}
-              </div>
-            )}
-            
-            {success && (
-              <div style={{ 
-                padding: '1rem', 
-                backgroundColor: 'rgb(240, 253, 244)', 
-                color: 'rgb(22, 163, 74)', 
-                borderRadius: '0.5rem',
-                marginBottom: '1rem'
-              }}>
-                {success}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem' }}>
-              <div>
-                <label className="label">Payment Reference *</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={paymentRef}
-                  onChange={(e) => setPaymentRef(e.target.value)}
-                  placeholder="Enter payment reference number"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="label">Receipt File *</label>
-                <input
-                  id="receipt-file"
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handleFileChange}
-                  required
-                  style={{ 
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid rgb(209, 213, 219)',
-                    borderRadius: '0.5rem'
-                  }}
-                />
-                <p style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)', marginTop: '0.5rem' }}>
-                  Accepted formats: Images (JPG, PNG) or PDF
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={uploading}
-                style={{ justifySelf: 'start' }}
-              >
-                {uploading ? 'Uploading...' : 'Upload Receipt'}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {booking.status === 'BOOKED_PAID' && (
-          <div style={{ 
-            marginTop: '2rem', 
-            padding: '1.5rem', 
-            backgroundColor: 'rgb(240, 253, 244)', 
-            borderRadius: '0.5rem',
-            border: '1px solid rgb(187, 247, 208)'
-          }}>
-            <h3 style={{ color: 'rgb(22, 163, 74)', marginBottom: '0.5rem' }}>✓ Booking Confirmed</h3>
-            <p style={{ color: 'rgb(22, 163, 74)' }}>
-              Your payment has been confirmed. Your booking is fully paid and confirmed.
+        {step && (
+          <div>
+            <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>
+              {showSlipDone ? 'Payment slip received' : step.title}
+            </h2>
+            <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '1.1rem' }}>
+              {showSlipDone ? 'The church office will check your slip and email you once your booking is confirmed.' : step.text}
             </p>
           </div>
         )}
-
-        {booking.status === 'REJECTED' && (
-          <div style={{ 
-            marginTop: '2rem', 
-            padding: '1.5rem', 
-            backgroundColor: 'rgb(254, 242, 242)', 
-            borderRadius: '0.5rem',
-            border: '1px solid rgb(254, 202, 202)'
-          }}>
-            <h3 style={{ color: 'rgb(220, 38, 38)', marginBottom: '0.5rem' }}>Booking Rejected</h3>
-            <p style={{ color: 'rgb(220, 38, 38)' }}>
-              This booking request has been rejected. Please contact us if you have any questions.
-            </p>
+        {booking.amount ? (
+          <div style={{ padding: '1.1rem 1.25rem', borderRadius: 'var(--radius)', background: 'var(--bg)', border: '1px solid var(--line)' }}>
+            <div style={{ color: 'var(--text-2)', fontWeight: 600 }}>Amount to pay</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.025em' }}>
+              LKR {booking.amount.toLocaleString()}
+            </div>
           </div>
-        )}
-
-        {booking.status === 'AUTO_CANCELLED' && (
-          <div style={{
-            marginTop: '2rem',
-            padding: '1.5rem',
-            backgroundColor: 'rgb(255, 247, 237)',
-            borderRadius: '0.5rem',
-            border: '1px solid rgb(253, 186, 116)'
-          }}>
-            <h3 style={{ color: 'rgb(194, 65, 12)', marginBottom: '0.5rem' }}>Booking automatically cancelled</h3>
-            <p style={{ color: 'rgb(120, 53, 15)' }}>
-              This booking was cancelled automatically because payment was not fully confirmed at least one hour before
-              the scheduled start time. The time slot has been released. Please contact us if you need help or wish to
-              book again.
-            </p>
-          </div>
-        )}
+        ) : null}
       </div>
+
+      <div className="card">
+        <h2 className="section-label">Booking details</h2>
+        <dl className="details">
+          <div><dt>Booking reference</dt><dd>{booking.bookingRef}</dd></div>
+          <div><dt>Hall</dt><dd>{booking.hall}</dd></div>
+          <div><dt>Date</dt><dd>{longDate(booking.date)}</dd></div>
+          <div><dt>Time</dt><dd>{booking.startTime} – {booking.endTime}</dd></div>
+          <div><dt>Purpose</dt><dd>{booking.purpose}</dd></div>
+          <div><dt>Requested by</dt><dd>{booking.requesterName}</dd></div>
+          <div><dt>Email</dt><dd style={{ wordBreak: 'break-all' }}>{booking.email}</dd></div>
+          <div><dt>Phone</dt><dd>{booking.phone}</dd></div>
+          {booking.paymentRef && <div><dt>Payment reference</dt><dd>{booking.paymentRef}</dd></div>}
+          {booking.slipReceived && <div><dt>Payment slip</dt><dd>Received ✓</dd></div>}
+        </dl>
+      </div>
+
+      {booking.status === 'APPROVED_PENDING_PAYMENT' && (
+        <div className="card stack panel-enter" style={{ gap: '1.25rem' }}>
+          <div>
+            <span className="eyebrow">Last step</span>
+            <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>Upload Payment Receipt</h2>
+            <p style={{ margin: 0, color: 'var(--text-2)' }}>
+              Enter the reference from your bank transfer and attach a photo or PDF of the slip.
+            </p>
+          </div>
+
+          {error && <Alert tone="error">{error}</Alert>}
+          {success && <Alert tone="success">{success}</Alert>}
+
+          <form onSubmit={handleSubmit} className="form-grid">
+            <div>
+              <label className="label" htmlFor="payment-ref">Payment Reference *</label>
+              <input
+                id="payment-ref"
+                type="text"
+                className="input"
+                value={paymentRef}
+                onChange={(e) => setPaymentRef(e.target.value)}
+                placeholder="Enter payment reference number"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="receipt-file">Receipt File *</label>
+              <input
+                id="receipt-file"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleFileChange}
+                required
+                className="input"
+                style={{ padding: '0.75rem 1rem', cursor: 'pointer' }}
+              />
+              <p className="hint">A photo (JPG or PNG) or a PDF, up to 4 MB.</p>
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={uploading} style={{ width: '100%' }}>
+              {uploading ? 'Uploading…' : 'Upload Receipt'}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
-

@@ -1,95 +1,174 @@
 'use client';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { IconArrow, IconClose, IconCross, IconMenu } from './Icons';
+
+const LINKS = [
+  { href: '/', label: 'Home' },
+  { href: '/notices', label: 'Notices' },
+  { href: '/sermons', label: 'Sermons' },
+  { href: '/processes', label: 'Processes' },
+  { href: '/book-hall', label: 'Book the Hall' },
+];
+
+function isActive(pathname: string, href: string) {
+  return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
+}
 
 export default function Header() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const pathname = usePathname() || '/';
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in as admin
     const checkAuth = async () => {
       try {
         const res = await fetch('/api/auth/check');
         if (res.ok) {
           const data = await res.json();
           setUserName(data.name || data.email || null);
-          if (data.role === 'admin') {
-            setIsAdmin(true);
-            setUserRole('admin');
-            document.body.classList.add('admin-mode');
-          } else if (data.role === 'staff') {
-            setUserRole('staff');
-          }
+          setUserRole(data.role === 'admin' || data.role === 'staff' ? data.role : null);
         } else {
           setUserName(null);
-          document.body.classList.remove('admin-mode');
+          setUserRole(null);
         }
-      } catch (error) {
+      } catch {
         setUserName(null);
-        document.body.classList.remove('admin-mode');
+        setUserRole(null);
       }
     };
     checkAuth();
-    
-    // Check periodically in case of session changes
-    const interval = setInterval(checkAuth, 30000); // Check every 30 seconds
+    const interval = setInterval(checkAuth, 30000);
     return () => clearInterval(interval);
+  }, [pathname]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const handleLogout = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    
-    // Ask for confirmation
-    const confirmed = window.confirm('Are you sure you want to logout?');
-    if (!confirmed) {
-      return; // User cancelled
-    }
-    
+  // Close the menu after navigating, and stop the page scrolling behind it.
+  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+
+  const handleLogout = async () => {
+    if (!window.confirm('Do you want to log out?')) return;
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-      document.body.classList.remove('admin-mode');
-      window.location.href = '/';
-    } catch (error) {
-      console.error('Logout error:', error);
+    } finally {
       window.location.href = '/';
     }
   };
 
+  const links = [
+    ...LINKS,
+    ...(userRole ? [{ href: '/admin', label: userRole === 'admin' ? 'Admin' : 'Staff area' }] : []),
+  ];
+
   return (
-    <header className={`app-header ${isAdmin ? 'admin-mode' : ''}`}>
-      <div className="app-header-inner">
-        <div>
-          <div className={`app-title ${isAdmin ? 'admin-title' : ''}`}>Church Portal</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <nav className="app-nav">
-            <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/">Home</Link>
-            <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/notices">Notices</Link>
-            <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/sermons">Sermons</Link>
-            <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/processes">Processes</Link>
-            <Link className={`app-nav-link ${isAdmin ? 'admin-nav-regular' : ''}`} href="/book-hall">Book Hall</Link>
-            {isAdmin && (
-              <Link className="app-nav-link admin-nav-admin" href="/admin">Admin</Link>
-            )}
-            {!userRole && (
-              <Link className="app-nav-link" href="/login">Staff Login</Link>
-            )}
+    <>
+      <header className={`app-header ${scrolled ? 'is-scrolled' : ''}`}>
+        <div className="app-header-inner">
+          <Link href="/" className="brand" aria-label="Mount Lavinia Methodist Church, home">
+            <span className="brand-mark">
+              <IconCross size={22} />
+            </span>
+            <span className="brand-text">
+              <span className="brand-name">Mount Lavinia</span>
+              <span className="brand-sub">Methodist Church</span>
+            </span>
+          </Link>
+
+          <nav className="app-nav" aria-label="Main">
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`app-nav-link ${isActive(pathname, l.href) ? 'is-active' : ''} ${
+                  l.href === '/admin' ? 'admin-nav-admin' : ''
+                }`}
+                aria-current={isActive(pathname, l.href) ? 'page' : undefined}
+              >
+                {l.label}
+              </Link>
+            ))}
           </nav>
-          {(userName || userRole) && (
-            <div className="user-info">
-              {userName && (
-                <span className="user-name">{userName}</span>
-              )}
-              {userRole && (
-                <button className="user-logout-btn" onClick={handleLogout}>Logout</button>
-              )}
-            </div>
-          )}
+
+          <div className="header-actions">
+            {userRole ? (
+              <div className="user-info">
+                <span className="role-pill">{userRole === 'admin' ? 'Admin' : 'Staff'}</span>
+                {userName && <span className="user-name">{userName}</span>}
+                <button className="user-logout-btn" onClick={handleLogout}>
+                  Log out
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" className="user-logout-btn staff-login-link">
+                Staff login
+              </Link>
+            )}
+            <button
+              className="menu-btn"
+              onClick={() => setMenuOpen(true)}
+              aria-expanded={menuOpen}
+              aria-controls="site-menu"
+            >
+              <IconMenu size={22} />
+              Menu
+            </button>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {menuOpen && (
+        <div className="menu-sheet" id="site-menu" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="menu-sheet-inner">
+            <div className="menu-sheet-top">
+              <span className="brand-name">Menu</span>
+              <button className="menu-btn" onClick={() => setMenuOpen(false)} autoFocus>
+                <IconClose size={22} />
+                Close
+              </button>
+            </div>
+            <nav aria-label="Main">
+              {[...links, ...(userRole ? [] : [{ href: '/login', label: 'Staff login' }])].map((l, i) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={`menu-sheet-link ${isActive(pathname, l.href) ? 'is-active' : ''}`}
+                  style={{ animationDelay: `${80 + i * 55}ms` }}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {l.label}
+                  <IconArrow size={24} />
+                </Link>
+              ))}
+            </nav>
+            {userRole && (
+              <div style={{ marginTop: '2rem', display: 'grid', gap: '0.75rem' }}>
+                <p style={{ margin: 0, color: 'var(--text-3)' }}>
+                  Signed in as {userName} ({userRole === 'admin' ? 'Admin' : 'Staff'})
+                </p>
+                <button className="btn-secondary" onClick={handleLogout}>
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
-

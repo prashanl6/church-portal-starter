@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import RichTextEditor from '@/components/RichTextEditor';
 import type { ProcessAudience } from '@/lib/processAudience';
+import { PageHeader, EmptyState, Alert, SkeletonList, RowChevron, longDate } from '@/components/ui';
+import { IconBook, IconNotice } from '@/components/Icons';
+import Reveal from '@/components/Reveal';
 
 interface Attachment {
   id: number;
@@ -51,20 +54,20 @@ function AudienceRadios(props: {
 }) {
   const { value, onChange, name } = props;
   return (
-    <fieldset className="grid gap-2">
-      <legend className="label mb-0">Tag (required)</legend>
-      <p className="text-xs text-gray-600">
-        <strong>Public</strong> — listed for everyone, including without a login. <strong>Steward</strong> — listed only
-        for users who are logged in.
+    <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+      <legend className="label">Who can see this? (required)</legend>
+      <div className="segmented" role="radiogroup">
+        {(['public', 'steward'] as const).map((v) => (
+          <label key={v} className={value === v ? 'is-active' : ''} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', minHeight: 44, padding: '0 1.1rem', borderRadius: 12, cursor: 'pointer', fontWeight: 500 }}>
+            <input type="radio" name={name} value={v} checked={value === v} onChange={() => onChange(v)} />
+            {v === 'public' ? 'Public' : 'Steward'}
+          </label>
+        ))}
+      </div>
+      <p className="hint">
+        <strong>Public</strong>: everyone can see it, without logging in. <strong>Steward</strong>: only people who are
+        logged in can see it.
       </p>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input type="radio" name={name} value="public" checked={value === 'public'} onChange={() => onChange('public')} />
-        Public
-      </label>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input type="radio" name={name} value="steward" checked={value === 'steward'} onChange={() => onChange('steward')} />
-        Steward
-      </label>
     </fieldset>
   );
 }
@@ -229,26 +232,9 @@ export default function ProcessesPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh' }}>
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{
-            height: '2.5rem',
-            backgroundColor: 'rgb(226, 232, 240)',
-            borderRadius: '0.5rem',
-            width: '12rem',
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-          }}></div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} style={{
-              height: '5rem',
-              backgroundColor: 'rgb(241, 245, 249)',
-              borderRadius: '0.5rem',
-              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-            }}></div>
-          ))}
-        </div>
+      <div className="page">
+        <div className="skeleton" style={{ height: 48, width: '16rem' }} />
+        <SkeletonList rows={4} />
       </div>
     );
   }
@@ -256,472 +242,306 @@ export default function ProcessesPage() {
   if (editingId) {
     const process = processes.find(p => p.id === editingId);
     return (
-      <div style={{ minHeight: '100vh' }}>
-        <div className="card" style={{ marginBottom: '2rem' }}>
-          <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button
-              onClick={cancelEdit}
-              className="btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '2.5rem',
-                height: '2.5rem',
-                padding: 0,
-                flexShrink: 0
-              }}
-              title="Cancel editing"
-            >
-              <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <h1 className="page-title" style={{ margin: 0, flex: 1 }}>Edit Process Document</h1>
-          </div>
-          <form onSubmit={handleUpdate} className="grid gap-4">
-            <div>
-              <label className="label">Title</label>
-              <input
-                className="input"
-                type="text"
-                value={editForm.title}
-                onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                required
-              />
-            </div>
-            <AudienceRadios
-              name="public-edit-process-audience"
-              value={editForm.audience}
-              onChange={(audience) => setEditForm({ ...editForm, audience })}
+      <div className="page panel-enter">
+        <div>
+          <button type="button" onClick={cancelEdit} className="back-link" style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }}>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+            Back to processes
+          </button>
+          <PageHeader
+            title="Edit Process Document"
+            subtitle="Your changes are sent to a second administrator. They go live only after approval."
+          />
+        </div>
+        <form onSubmit={handleUpdate} className="card form-grid">
+          <div>
+            <label className="label" htmlFor="public-edit-title">Title</label>
+            <input
+              id="public-edit-title"
+              className="input"
+              type="text"
+              value={editForm.title}
+              onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+              required
             />
-            <div>
-              <label className="label">Content</label>
-              <RichTextEditor
-                value={editForm.contentHtml}
-                onChange={(value) => setEditForm({ ...editForm, contentHtml: value })}
-                placeholder="Enter process document content. Use the toolbar to format text with bold, italic, underline, colors, and more..."
-              />
-            </div>
-            {process && isAdmin && (
-              <div style={{ borderTop: '1px solid rgb(226, 232, 240)', paddingTop: '1rem' }}>
-                <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Attached documents (Excel / Word)</h2>
-                <p style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)', marginBottom: '0.5rem' }}>
+          </div>
+          <AudienceRadios
+            name="public-edit-process-audience"
+            value={editForm.audience}
+            onChange={(audience) => setEditForm({ ...editForm, audience })}
+          />
+          <div>
+            <label className="label">Content</label>
+            <RichTextEditor
+              value={editForm.contentHtml}
+              onChange={(value) => setEditForm({ ...editForm, contentHtml: value })}
+              placeholder="Enter process document content. Use the toolbar to format text with bold, italic, underline, colors, and more..."
+            />
+          </div>
+          {process && isAdmin && (
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.5rem' }} className="stack">
+              <div>
+                <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>Attached documents (Excel / Word)</h2>
+                <p className="hint" style={{ marginTop: 0 }}>
                   New files upload when you submit. Removals apply only after this update is approved.
                 </p>
-                <p
-                  style={{
-                    fontSize: '0.8125rem',
-                    color: 'rgb(120, 53, 15)',
-                    background: 'rgb(255, 251, 235)',
-                    border: '1px solid rgb(253, 230, 138)',
-                    borderRadius: '0.375rem',
-                    padding: '0.5rem 0.75rem',
-                    marginBottom: '0.75rem',
-                  }}
-                >
-                  Files you remove stay on the live document until an approver approves this edit.
-                </p>
-                {(process.attachments ?? []).length === 0 ? (
-                  <p style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)' }}>No files attached yet.</p>
-                ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1rem 0', display: 'grid', gap: '0.5rem' }}>
-                    {(process.attachments ?? []).map((a) => {
-                      const marked = editPendingRemoveIds.includes(a.id);
-                      return (
-                        <li
-                          key={a.id}
-                          style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            fontSize: '0.875rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '0.375rem',
-                            border: marked ? '1px solid rgb(253, 230, 138)' : '1px solid rgb(226, 232, 240)',
-                            background: marked ? 'rgb(255, 251, 235)' : 'rgb(248, 250, 252)',
-                          }}
-                        >
+              </div>
+              <Alert tone="warning">Files you remove stay on the live document until an approver approves this edit.</Alert>
+              {(process.attachments ?? []).length === 0 ? (
+                <p style={{ color: 'var(--text-3)', margin: 0 }}>No files attached yet.</p>
+              ) : (
+                <div className="list-group">
+                  {(process.attachments ?? []).map((a) => {
+                    const marked = editPendingRemoveIds.includes(a.id);
+                    return (
+                      <div key={a.id} className="list-row" style={{ cursor: 'default', background: marked ? '#fbf1e1' : undefined }}>
+                        <span className="list-row-main">
                           <a
                             href={a.storedPath}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{
-                              color: 'rgb(37, 99, 235)',
-                              textDecoration: marked ? 'line-through' : undefined,
-                              opacity: marked ? 0.85 : 1,
-                            }}
+                            className="list-row-title"
+                            style={{ color: 'var(--accent)', textDecoration: marked ? 'line-through' : undefined }}
                           >
                             {a.fileName}
                           </a>
-                          {formatBytes(a.byteSize) && (
-                            <span style={{ color: 'rgb(148, 163, 184)' }}>{formatBytes(a.byteSize)}</span>
-                          )}
-                          {marked ? (
-                            <>
-                              <span style={{ fontSize: '0.75rem', color: 'rgb(146, 64, 14)' }}>Pending removal</span>
-                              <button
-                                type="button"
-                                onClick={() => setEditPendingRemoveIds((prev) => prev.filter((x) => x !== a.id))}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: 'rgb(37, 99, 235)',
-                                  cursor: 'pointer',
-                                  fontSize: '0.8125rem',
-                                  textDecoration: 'underline',
-                                  padding: 0,
-                                }}
-                              >
-                                Undo
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditPendingRemoveIds((prev) => (prev.includes(a.id) ? prev : [...prev, a.id]))
-                              }
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'rgb(220, 38, 38)',
-                                cursor: 'pointer',
-                                fontSize: '0.8125rem',
-                                textDecoration: 'underline',
-                                padding: 0,
-                              }}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                <label className="label" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  Add Excel / Word files (optional)
-                </label>
+                          <span className="list-row-meta">
+                            {formatBytes(a.byteSize)}
+                            {marked && <> {formatBytes(a.byteSize) ? '· ' : ''}<span className="badge badge-amber">Pending removal</span></>}
+                          </span>
+                        </span>
+                        {marked ? (
+                          <button
+                            type="button"
+                            className="btn-quiet"
+                            onClick={() => setEditPendingRemoveIds((prev) => prev.filter((x) => x !== a.id))}
+                          >
+                            Undo
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-quiet danger"
+                            onClick={() =>
+                              setEditPendingRemoveIds((prev) => (prev.includes(a.id) ? prev : [...prev, a.id]))
+                            }
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div>
+                <label className="label" htmlFor="public-edit-files">Add Excel / Word files (optional)</label>
                 <input
+                  id="public-edit-files"
                   type="file"
                   multiple
                   accept={FILE_INPUT_ACCEPT}
-                  style={{ fontSize: '0.875rem' }}
+                  className="input"
+                  style={{ paddingTop: '0.7rem' }}
                   onChange={(e) => {
                     const next = Array.from(e.target.files || []);
                     e.target.value = '';
                     if (next.length) setEditPendingFiles((prev) => [...prev, ...next]);
                   }}
                 />
-                {editPendingFiles.length > 0 && (
-                  <ul style={{ listStyle: 'none', padding: '0.5rem', margin: '0.75rem 0 0', background: 'rgb(248, 250, 252)', borderRadius: '0.375rem', border: '1px solid rgb(226, 232, 240)', fontSize: '0.875rem' }}>
-                    {editPendingFiles.map((f, i) => (
-                      <li key={`${f.name}-${i}-${f.size}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => setEditPendingFiles((prev) => prev.filter((_, j) => j !== i))}
-                          style={{ background: 'none', border: 'none', color: 'rgb(220, 38, 38)', cursor: 'pointer', fontSize: '0.8125rem', flexShrink: 0 }}
-                        >
-                          Remove
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <p className="hint">Excel or Word only, up to 4 MB each.</p>
               </div>
-            )}
-            <div className="flex gap-2">
-              <button className="btn w-fit" type="submit">Submit Update for Approval</button>
-              <button className="btn-secondary w-fit" type="button" onClick={cancelEdit}>Cancel</button>
+              {editPendingFiles.length > 0 && (
+                <div className="list-group">
+                  {editPendingFiles.map((f, i) => (
+                    <div key={`${f.name}-${i}-${f.size}`} className="list-row" style={{ cursor: 'default', minHeight: 56 }}>
+                      <span className="list-row-main" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span className="list-row-title" style={{ fontWeight: 500 }}>{f.name}</span>
+                        <span className="list-row-meta">Will upload when you submit</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-quiet danger"
+                        onClick={() => setEditPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </form>
-        </div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <button className="btn" type="submit">Submit Update for Approval</button>
+            <button className="btn-secondary" type="button" onClick={cancelEdit}>Cancel</button>
+          </div>
+        </form>
       </div>
     );
   }
 
   if (selectedProcess) {
+    const files = selectedProcess.attachments ?? [];
     return (
-      <div style={{ minHeight: '100vh' }}>
-        <div className="card" style={{
-          marginBottom: '2rem',
-          animation: 'slideIn 0.4s ease-out'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
-              <button
-                onClick={() => setSelectedProcess(null)}
-                className="btn-secondary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  padding: 0,
-                  flexShrink: 0
-                }}
-                title="Back to processes"
-              >
-                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div style={{ flex: 1 }}>
-                <h1 className="page-title" style={{
-                  fontSize: '1.75rem',
-                  marginBottom: '0.5rem',
-                  marginTop: 0
-                }}>{selectedProcess.title}</h1>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: 'rgb(100, 116, 139)',
-                  margin: 0
-                }}>
-                  {isLoggedIn && (
-                    <>
-                      Tag: {selectedProcess.audience === 'steward' ? 'Steward' : 'Public'}
-                      {' · '}
-                    </>
-                  )}
-                  Version {selectedProcess.version} · Updated {new Date(selectedProcess.updatedAt).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-            {isAdmin && (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  onClick={() => handleEdit(selectedProcess)}
-                  className="btn"
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(selectedProcess.id, selectedProcess.title)}
-                  className="btn btn-delete"
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    fontSize: '0.875rem',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Documents</h2>
-            {(selectedProcess.attachments ?? []).length === 0 ? (
-              <p style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)', margin: 0 }}>No Excel or Word attachments.</p>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.5rem' }}>
-                {(selectedProcess.attachments ?? []).map((a) => (
-                  <li
-                    key={a.id}
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      fontSize: '0.9375rem',
-                    }}
+      <div className="page panel-enter">
+        <div>
+          <button type="button" onClick={() => setSelectedProcess(null)} className="back-link" style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }}>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+            All processes
+          </button>
+          <PageHeader
+            title={selectedProcess.title}
+            subtitle={
+              <>
+                {isLoggedIn && (
+                  <span className={`badge ${selectedProcess.audience === 'steward' ? 'badge-blue' : ''}`} style={{ marginRight: '0.6rem' }}>
+                    {selectedProcess.audience === 'steward' ? 'Steward' : 'Public'}
+                  </span>
+                )}
+                Version {selectedProcess.version} · Updated {longDate(selectedProcess.updatedAt)}
+              </>
+            }
+            actions={
+              isAdmin ? (
+                <>
+                  <button onClick={() => handleEdit(selectedProcess)} className="btn-secondary">
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(selectedProcess.id, selectedProcess.title)}
+                    className="btn btn-delete"
                   >
-                    <a
-                      href={a.storedPath}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: 'rgb(37, 99, 235)', fontWeight: 500 }}
-                    >
-                      {a.fileName}
-                    </a>
-                    {formatBytes(a.byteSize) && (
-                      <span style={{ fontSize: '0.8125rem', color: 'rgb(148, 163, 184)' }}>{formatBytes(a.byteSize)}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {isAdmin && (
-              <p style={{ fontSize: '0.8125rem', color: 'rgb(100, 116, 139)', marginTop: '0.75rem', marginBottom: 0 }}>
-                To add or remove attachments, use <strong>Edit</strong>.
-              </p>
-            )}
-          </div>
-
-          <article 
-            className="notice-content"
-            style={{
-              fontSize: '1.1rem',
-              lineHeight: 1.75,
-              color: 'rgb(55, 65, 81)'
-            }}
-            dangerouslySetInnerHTML={{ __html: selectedProcess.contentHtml }}
+                    Delete
+                  </button>
+                </>
+              ) : undefined
+            }
           />
         </div>
+
+        <article
+          className="card notice-content"
+          dangerouslySetInnerHTML={{ __html: selectedProcess.contentHtml }}
+        />
+
+        <section>
+          <h2 className="section-label">Documents</h2>
+          {files.length === 0 ? (
+            <p style={{ color: 'var(--text-3)', margin: 0 }}>No Excel or Word attachments.</p>
+          ) : (
+            <div className="list-group">
+              {files.map((a) => (
+                <a key={a.id} href={a.storedPath} target="_blank" rel="noopener noreferrer" className="list-row">
+                  <span className="tile-icon" style={{ width: 44, height: 44, borderRadius: 12, margin: 0, background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+                    <IconNotice size={22} />
+                  </span>
+                  <span className="list-row-main">
+                    <span className="list-row-title">{a.fileName}</span>
+                    <span className="list-row-meta">
+                      Tap to open{formatBytes(a.byteSize) ? ` · ${formatBytes(a.byteSize)}` : ''}
+                    </span>
+                  </span>
+                  <RowChevron />
+                </a>
+              ))}
+            </div>
+          )}
+          {isAdmin && (
+            <p className="hint">
+              To add or remove attachments, use <strong>Edit</strong>.
+            </p>
+          )}
+        </section>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
-      <div style={{ paddingTop: '3rem', paddingBottom: '3rem' }}>
-        <div style={{ marginBottom: '2rem' }}>
-          <h1 className="page-title" style={{ marginBottom: '0.5rem' }}>Process Documents</h1>
-          <p className="page-subtitle" style={{ marginBottom: 0 }}>
-            View and manage church process documents.
+    <div className="page">
+      <PageHeader
+        title="Process Documents"
+        subtitle={
+          <>
+            Step-by-step guides and forms for church activities.
             {!isLoggedIn
               ? ' Only public documents are listed — sign in to see steward documents.'
               : ' Signed in — public and steward documents are listed.'}
-          </p>
-        </div>
+          </>
+        }
+      />
 
-        {processes.length === 0 ? (
-          <div className="card" style={{
-            textAlign: 'center',
-            paddingTop: '3rem',
-            paddingBottom: '3rem'
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
-            <p style={{
-              color: 'rgb(100, 116, 139)',
-              fontSize: '1.125rem',
-              margin: 0
-            }}>No process documents available</p>
-          </div>
-        ) : (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem'
-          }}>
-            {processes.map((process, index) => (
-              <div
-                key={process.id}
-                className="card"
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: '1rem',
-                  animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`,
-                  padding: '1.5rem'
-                }}
-              >
-                <button
-                  onClick={() => setSelectedProcess(process)}
-                  style={{
-                    flex: 1,
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: '1rem'
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <h2 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: 600,
-                      color: 'rgb(15, 23, 42)',
-                      margin: 0,
-                      marginBottom: '0.25rem',
+      {processes.length === 0 ? (
+        <EmptyState icon={<IconBook />} title="No process documents available" text="New guides will appear here once they are published." />
+      ) : (
+        <Reveal>
+          <div className="list-group">
+            {processes.map((process) => {
+              const count = (process.attachments ?? []).length;
+              return (
+                <div key={process.id} className="list-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setSelectedProcess(process)}
+                    style={{
+                      flex: '1 1 16rem',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      flexWrap: 'wrap',
-                    }}>
-                      {process.title}
-                      {isLoggedIn && process.audience === 'steward' && (
-                        <span
-                          style={{
-                            fontSize: '0.6875rem',
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em',
-                            padding: '0.125rem 0.5rem',
-                            borderRadius: '9999px',
-                            background: 'rgb(237, 233, 254)',
-                            color: 'rgb(91, 33, 182)',
-                          }}
-                        >
-                          Steward
-                        </span>
-                      )}
-                    </h2>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: 'rgb(100, 116, 139)',
-                      margin: 0
-                    }}>
-                      Version {process.version} · Updated {new Date(process.updatedAt).toLocaleDateString()}
-                      {(process.attachments ?? []).length > 0
-                        ? ` · ${(process.attachments ?? []).length} file${(process.attachments ?? []).length !== 1 ? 's' : ''}`
-                        : ''}
-                    </p>
-                  </div>
-                  <svg style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
-                    color: 'rgb(148, 163, 184)',
-                    flexShrink: 0,
-                    marginTop: '0.25rem'
-                  }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-                {isAdmin && (
-                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(process);
-                      }}
-                      className="btn"
-                      style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(process.id, process.title);
-                      }}
-                      className="btn btn-delete"
-                      style={{ 
-                        padding: '0.5rem 1rem', 
-                        fontSize: '0.875rem',
-                        border: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+                      gap: '1rem',
+                      minHeight: 56,
+                      background: 'none',
+                      border: 0,
+                      padding: 0,
+                      font: 'inherit',
+                      color: 'inherit',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span className="tile-icon" style={{ width: 48, height: 48, borderRadius: 14, margin: 0, background: '#e7f1f3', color: '#3e7480', flexShrink: 0 }}>
+                      <IconBook size={24} />
+                    </span>
+                    <span className="list-row-main">
+                      <span className="list-row-title">
+                        {process.title}
+                        {isLoggedIn && process.audience === 'steward' && (
+                          <span className="badge badge-blue" style={{ marginLeft: '0.6rem', verticalAlign: 'middle' }}>Steward</span>
+                        )}
+                      </span>
+                      <span className="list-row-meta">
+                        Updated {longDate(process.updatedAt)}
+                        {count > 0 ? ` · ${count} file${count !== 1 ? 's' : ''}` : ''}
+                      </span>
+                    </span>
+                    <RowChevron />
+                  </button>
+                  {isAdmin && (
+                    <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(process);
+                        }}
+                        className="btn-quiet"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(process.id, process.title);
+                        }}
+                        className="btn-quiet danger"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
-      </div>
+        </Reveal>
+      )}
     </div>
   );
 }
-
