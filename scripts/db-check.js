@@ -69,6 +69,13 @@ async function main() {
     byIp.hostname = v4;
     byIp.searchParams.set('options', `endpoint=${endpoint}`);
     trySelect('IPv4 address + endpoint option', byIp.toString());
+    try {
+      require('fs').writeFileSync('/etc/gai.conf', 'precedence ::ffff:0:0/96  100\n');
+      console.log(`[db-check] wrote /etc/gai.conf (uid ${process.getuid && process.getuid()})`);
+      trySelect('hostname with IPv4 preferred', raw);
+    } catch (e) {
+      console.log(`[db-check] cannot write /etc/gai.conf: ${e.code || e.message}`);
+    }
   }
   return 1;
 }
