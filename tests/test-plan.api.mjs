@@ -358,9 +358,9 @@ const bB = (await adminBookings()).find((b) => b.bookingRef === reqB.data.bookin
 const apA = (await pendingFor(admin1, 'booking')).find((a) => a.resourceId === bA.id);
 ok(apA?.canAct === true, 'any admin can act on a public request');
 ok((await approve(admin1, apA?.id)).status === 200, 'admin1 approves Booking A');
-const viewA = (await call(`/api/bookings/${reqA.data.bookingRef}`)).data.booking;
-ok(viewA.status === 'APPROVED_PENDING_PAYMENT', 'A is approved, awaiting payment');
-ok(viewA.bankAccount?.accountNumber === '1234567890', 'booking page shows the church bank details to pay into', j(viewA.bankAccount));
+const pageA = (await call(`/api/bookings/${reqA.data.bookingRef}`)).data.booking;
+ok(pageA.status === 'APPROVED_PENDING_PAYMENT', 'A is approved, awaiting payment');
+ok(pageA.bankAccount?.accountNumber === '1234567890', 'booking page shows the church bank details to pay into', j(pageA.bankAccount));
 ok((await call('/api/bookings/availability')).data.booked.some((x) => String(x.date).startsWith(bookingDay) && x.startTime === '10:00'), 'calendar shows 12 Dec 10:00–12:00');
 
 test('BKG-05', 'Clash blocked');
