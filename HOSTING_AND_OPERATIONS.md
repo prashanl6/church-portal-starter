@@ -219,30 +219,26 @@ If you do not use Vercel, run the same URL on a schedule from **cron**, **GitHub
 
 | Symptom | Things to check |
 |---------|------------------|
-| Cannot log into `/admin` after deploy | **(1)** Production DB often has **no users** — migrations do not run `seed`. Create users: run `npx prisma db seed` from your machine with `DATABASE_URL` pointing at production, **or** use the one-time **`POST /api/auth/bootstrap`** (set `BOOTSTRAP_ADMIN_SECRET` in Vercel, then remove it). **(2)** Set a strong **`JWT_SECRET`** in Vercel (not the dev default). **(3)** Auth cookies use **`Secure` on HTTPS** — the app sets this in production. |
+| Cannot log into `/admin` after deploy | A new database has **no accounts**: use First-time setup on `/login` (section 8.1). |
 | Emails not sending | SMTP vars, provider blocking “less secure” apps, `FROM_EMAIL` alignment with provider. |
 | Cron always401/500 | `CRON_SECRET` set in production but scheduler missing `Authorization: Bearer ...`. |
 | Processes missing for public | Status must be **published** and tag **Public** for anonymous users. |
 | Build fails on migrate (`P1001`) | `DATABASE_URL` unreachable from the production build: check the database is running and not suspended or over quota (Neon console), and that the URL is current. |
 
-### 8.1 First admin on production (e.g. Vercel)
+### 8.1 First administrators on production
 
-Deploying runs **migrations** but **not** the demo **seed**, so the `User` table is often **empty** and every login returns “Invalid credentials”.
+Deploying runs migrations and adds reference data (hall rate, process guides, welcome notice) but creates **no accounts**. Every change needs a second administrator, so a new site needs **two**.
 
-**Option A — Bootstrap (quick)**  
-1. In Vercel → Environment Variables, add **`BOOTSTRAP_ADMIN_SECRET`** (long random string). Redeploy.  
-2. Open **`/login`**: if the database has no users, a **First-time setup** form appears — enter the same secret plus name, email, and password — **or** send a **single** POST (then remove the env var):
+1. Make sure **`BOOTSTRAP_ADMIN_SECRET`** is set in Vercel → Environment Variables.
+2. Open **`/login`**. A **First-time setup** box appears. Enter that secret plus a name, email and password for the **first** administrator, then the same for the **second** (a different person). The box disappears once two exist.
+3. Log in. Add staff (view only) and further administrators under **Admin → Accounts**; each new account starts working once the other administrator approves it in **Admin → Approvals**.
+4. Optionally remove `BOOTSTRAP_ADMIN_SECRET` from Vercel afterwards.
 
-```bash
-curl -sS -X POST "https://YOUR_DOMAIN.vercel.app/api/auth/bootstrap" \
-  -H "Content-Type: application/json" \
-  -d '{"secret":"YOUR_BOOTSTRAP_ADMIN_SECRET","email":"you@church.org","password":"YourSecurePass","name":"Admin"}'
-```
+**Never** run the demo seed (`npm run seed`) against production: its accounts have public passwords.
 
-3. Log in at `/login` with that email and password. **Unset `BOOTSTRAP_ADMIN_SECRET`** in Vercel afterward.
+### 8.2 Which database the site uses
 
-**Option B — Seed from your computer**  
-With `DATABASE_URL` set to the same database Vercel uses, run `npx prisma db seed` (see `README.md` for default demo accounts, or adjust `scripts/seed.js`).
+`src/lib/databaseUrl.js` picks, in order: `CHURCH_DATABASE_URL`, a database connected through **Vercel → Storage** (its `…_POSTGRES_PRISMA_URL` / `…_DATABASE_URL` variables, with or without a prefix such as `STORAGE_`), then `DATABASE_URL`. Migrations use the direct (`…_UNPOOLED` / `…_NON_POOLING`) connection. The build log prints which setting is in use and, if the connection fails, why (see `scripts/db-check.js`).
 
 ---
 
