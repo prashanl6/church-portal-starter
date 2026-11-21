@@ -57,13 +57,6 @@ export default function BookHallPage() {
       setMsg(quote.error);
       return;
     }
-    const fmt = (n: number) =>
-      n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const confirmMsg =
-      quote.total > 0
-        ? `Submit this booking request?\n\nEstimated hall hire: LKR ${fmt(quote.total)} (${quote.slots} × 30 min block${quote.slots !== 1 ? 's' : ''} at LKR ${fmt(ratePer30Minutes)} each)\n\nYou will still need admin approval before payment.`
-        : 'Submit this booking request? (No hall hire rate is configured yet — amount may be zero.)';
-    if (!window.confirm(confirmMsg)) return;
     setBookingRef('');
 
     const res = await fetch('/api/bookings/request', {
