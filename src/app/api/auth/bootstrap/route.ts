@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { createHash, timingSafeEqual } from 'crypto';
 import { prisma } from '@/lib/prisma';
+
+/** Ignore stray spaces, line breaks and surrounding quotes picked up when copying the secret. */
+function cleanSecret(v: unknown) {
+  return typeof v === 'string' ? v.trim().replace(/^(['"])(.*)\1$/, '$2').trim() : '';
+}
+
+function sameSecret(a: string, b: string) {
+  const h = (x: string) => createHash('sha256').update(x).digest();
+  return timingSafeEqual(h(a), h(b));
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +21,7 @@ export const dynamic = 'force-dynamic';
  * Remove or unset the secret after onboarding. Returns 404 if secret is not configured.
  */
 export async function POST(req: Request) {
-  const expected = process.env.BOOTSTRAP_ADMIN_SECRET?.trim();
+  const expected = cleanSecret(process.env.BOOTSTRAP_ADMIN_SECRET);
   if (!expected) {
     return new NextResponse(null, { status: 404 });
   }
@@ -22,8 +33,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (body.secret !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!sameSecret(cleanSecret(body.secret), expected)) {
+    return NextResponse.json(
+      { error: 'The setup secret does not match BOOTSTRAP_ADMIN_SECRET in Vercel. Copy it again from Vercel → Settings → Environment Variables (Production).' },
+      { status: 401 }
+    );
   }
 
   const count = await prisma.user.count({ where: { role: 'admin', status: 'active' } });
