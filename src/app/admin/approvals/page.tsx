@@ -1,4 +1,5 @@
 'use client';
+import { tell } from '@/components/Dialog';
 import useSWR from 'swr';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -71,8 +72,7 @@ function ApprovalsPageContent() {
       }) 
     });
     if (res.status === 401) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
+      tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
       return;
     }
     if (res.ok) {
@@ -81,7 +81,7 @@ function ApprovalsPageContent() {
       mutate();
     } else {
       const body = await res.json().catch(() => ({}));
-      alert(body.error || 'Could not approve. Please try again.');
+      tell(body.error || 'Could not approve. Please try again.');
       mutate();
     }
   }
@@ -91,9 +91,9 @@ function ApprovalsPageContent() {
     const isBooking = a.resourceType === 'booking';
     if (!comment[a.id] || comment[a.id].trim() === '') {
       if (isBooking) {
-        alert('Rejection reason is required for booking rejections');
+        tell('Rejection reason is required for booking rejections');
       } else {
-        alert('Please provide a reason for rejection');
+        tell('Please provide a reason for rejection');
       }
       return;
     }
@@ -105,8 +105,7 @@ function ApprovalsPageContent() {
       }) 
     });
     if (res.status === 401) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
+      tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
       return;
     }
     if (res.ok) {
@@ -115,7 +114,7 @@ function ApprovalsPageContent() {
       mutate();
     } else {
       const body = await res.json().catch(() => ({}));
-      alert(body.error || 'Could not reject. Please try again.');
+      tell(body.error || 'Could not reject. Please try again.');
       mutate();
     }
   }

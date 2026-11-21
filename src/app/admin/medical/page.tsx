@@ -1,4 +1,5 @@
 'use client';
+import { tell } from '@/components/Dialog';
 import useSWR from 'swr';
 import { useState } from 'react';
 import { PageHeader, ADMIN_BACK, EmptyState, SkeletonList, longDate } from '@/components/ui';
@@ -19,17 +20,16 @@ export default function MedicalEquipmentPage() {
       body: JSON.stringify(form)
     });
     if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
+      tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
       return;
     }
     if (res.ok) {
-      alert('Medical item created');
+      tell('Medical item created');
       setForm({ name: '', quantityTotal: 0, notes: '' });
       mutate();
     } else {
       const errorText = await res.text();
-      alert(errorText || 'Failed to create item');
+      tell(errorText || 'Failed to create item');
     }
   };
 
@@ -41,17 +41,16 @@ export default function MedicalEquipmentPage() {
       body: JSON.stringify(loanForm)
     });
     if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
+      tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
       return;
     }
     if (res.ok) {
-      alert('Loan request created');
+      tell('Loan request created');
       setLoanForm({ itemId: 0, givenTo: '', dueDate: '' });
       mutate();
     } else {
       const errorText = await res.text();
-      alert(errorText || 'Failed to create loan');
+      tell(errorText || 'Failed to create loan');
     }
   };
 
@@ -60,7 +59,7 @@ export default function MedicalEquipmentPage() {
     if (res.ok) {
       mutate();
     } else {
-      alert('Failed to approve loan');
+      tell('Failed to approve loan');
     }
   };
 
@@ -69,7 +68,7 @@ export default function MedicalEquipmentPage() {
     if (res.ok) {
       mutate();
     } else {
-      alert('Failed to issue loan');
+      tell('Failed to issue loan');
     }
   };
 
@@ -82,7 +81,7 @@ export default function MedicalEquipmentPage() {
     if (res.ok) {
       mutate();
     } else {
-      alert('Failed to return loan');
+      tell('Failed to return loan');
     }
   };
 

@@ -1,4 +1,5 @@
 'use client';
+import { ask, tell } from '@/components/Dialog';
 import useSWR from 'swr';
 import { useState, useEffect, useMemo } from 'react';
 import { PageHeader, ADMIN_BACK, EmptyState, SkeletonList } from '@/components/ui';
@@ -130,19 +131,18 @@ export default function AssetsPage() {
   const submit = async (e:any) => {
     e.preventDefault();
     if (!form.reference.trim() || !form.labelCategory) {
-      alert('Reference and Category are required');
+      tell('Reference and Category are required');
       return;
     }
     const url = editingId ? `/api/admin/assets/${editingId}` : '/api/admin/assets';
     const method = editingId ? 'PATCH' : 'POST';
     const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(form)});
     if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
+      tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
       return;
     }
     if (res.ok) { 
-      alert(editingId ? 'Asset update submitted for approval' : 'Asset created and submitted for approval'); 
+      tell(editingId ? 'Asset update submitted for approval' : 'Asset created and submitted for approval'); 
       setForm({ reference:'', value:0, quantity:0, labelCategory:'', notes:'' });
       setValueDisplay('');
       setEditingId(null);
@@ -159,7 +159,7 @@ export default function AssetsPage() {
           // Use default
         }
       }
-      alert(errorMsg);
+      tell(errorMsg);
     }
   };
   
@@ -222,18 +222,17 @@ export default function AssetsPage() {
   };
   
   const handleDelete = async (assetId: number, assetReference: string) => {
-    if (!window.confirm(`Are you sure you want to request deletion of asset "${assetReference}"? This will require approval before the asset is deleted.`)) {
+    if (!await ask(`Are you sure you want to request deletion of asset "${assetReference}"? This will require approval before the asset is deleted.`)) {
       return;
     }
     
     const res = await fetch(`/api/admin/assets/${assetId}`, { method: 'DELETE' });
     if (res.status === 401 || res.status === 403) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
+      tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
       return;
     }
     if (res.ok) {
-      alert('Delete request submitted for approval');
+      tell('Delete request submitted for approval');
       mutate();
     } else {
       let errorMsg = 'Failed to submit delete request';
@@ -247,7 +246,7 @@ export default function AssetsPage() {
           // Use default
         }
       }
-      alert(errorMsg);
+      tell(errorMsg);
     }
   };
   
@@ -416,7 +415,7 @@ export default function AssetsPage() {
 
                   const handleDeleteSummed = async () => {
                     const count = assetIds.length;
-                    if (!window.confirm(
+                    if (!await ask(
                       `Are you sure you want to request deletion of all ${count} asset record${count > 1 ? 's' : ''} with reference "${asset.reference}" in category "${category}"? This will require approval before the assets are deleted.`
                     )) {
                       return;
@@ -430,13 +429,13 @@ export default function AssetsPage() {
                       
                       const failed = results.filter(r => !r.ok).length;
                       if (failed === 0) {
-                        alert(`Delete requests submitted for ${count} asset record${count > 1 ? 's' : ''}. Awaiting approval.`);
+                        tell(`Delete requests submitted for ${count} asset record${count > 1 ? 's' : ''}. Awaiting approval.`);
                       } else {
-                        alert(`Submitted delete requests for ${count - failed} asset record${count - failed > 1 ? 's' : ''}. ${failed} request${failed > 1 ? 's' : ''} failed.`);
+                        tell(`Submitted delete requests for ${count - failed} asset record${count - failed > 1 ? 's' : ''}. ${failed} request${failed > 1 ? 's' : ''} failed.`);
                       }
                       mutate();
                     } catch (error) {
-                      alert('Failed to submit some delete requests. Please try again.');
+                      tell('Failed to submit some delete requests. Please try again.');
                     }
                   };
 

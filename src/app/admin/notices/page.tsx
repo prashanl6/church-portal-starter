@@ -1,4 +1,5 @@
 'use client';
+import { ask, tell } from '@/components/Dialog';
 import { useState } from 'react';
 import useSWR from 'swr';
 import RichTextEditor from '@/components/RichTextEditor';
@@ -12,10 +13,10 @@ export default function NoticesAdminPage() {
   const notices: NoticeRow[] = data?.list || [];
 
   const requestDelete = async (n: NoticeRow) => {
-    if (!window.confirm(`Ask to remove the notice "${n.title}"? A second administrator must approve before it disappears.`)) return;
+    if (!await ask(`Ask to remove the notice "${n.title}"? A second administrator must approve before it disappears.`)) return;
     const res = await fetch(`/api/admin/notices/${n.id}`, { method: 'DELETE' });
     const body = await res.json().catch(() => ({}));
-    alert(res.ok ? 'Removal sent for approval.' : body.error || 'Could not send the removal request.');
+    tell(res.ok ? 'Removal sent for approval.' : body.error || 'Could not send the removal request.');
     mutate();
   };
   const [form, setForm] = useState({
@@ -27,7 +28,7 @@ export default function NoticesAdminPage() {
   const submit = async (e:any) => {
     e.preventDefault();
     if (!form.title.trim() || !form.bodyHtml.trim()) {
-      alert('Please fill in all fields');
+      tell('Please fill in all fields');
       return;
     }
     const res = await fetch('/api/admin/notices', {
@@ -39,17 +40,16 @@ export default function NoticesAdminPage() {
       })
     });
     if (res.status === 401) {
-      alert('Your session has expired. Please log in again.');
-      window.location.href = '/login';
+      tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
       return;
     }
     if (res.ok) {
-      alert('Notice submitted for approval');
+      tell('Notice submitted for approval');
       mutate();
       setForm({ title: '', bodyHtml: '', weekOf: new Date().toISOString().split('T')[0] });
     } else {
       const errorText = await res.text();
-      alert(errorText || 'Failed to submit notice');
+      tell(errorText || 'Failed to submit notice');
     }
   };
 

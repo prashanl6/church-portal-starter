@@ -1,4 +1,5 @@
 'use client';
+import { ask, tell } from '@/components/Dialog';
 import useSWR from 'swr';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -168,7 +169,7 @@ function AdminBookingsPageContent() {
                     className="btn-quiet danger"
                     style={{ marginLeft: 'auto' }}
                     onClick={async () => {
-                      if (!window.confirm(`Are you sure you want to request deletion of booking ${booking.bookingRef}? This will require approval before the booking is deleted.`)) {
+                      if (!await ask(`Are you sure you want to request deletion of booking ${booking.bookingRef}? This will require approval before the booking is deleted.`)) {
                         return;
                       }
                       try {
@@ -176,14 +177,14 @@ function AdminBookingsPageContent() {
                           method: 'DELETE',
                         });
                         if (res.ok) {
-                          alert('Delete request submitted for approval');
+                          tell('Delete request submitted for approval');
                           mutate();
                         } else {
                           const error = await res.json();
-                          alert(error.error || 'Failed to submit delete request');
+                          tell(error.error || 'Failed to submit delete request');
                         }
                       } catch (error) {
-                        alert('Failed to submit delete request');
+                        tell('Failed to submit delete request');
                       }
                     }}
                   >
@@ -234,7 +235,7 @@ function AdminBookingsPageContent() {
             onClick={async () => {
               const n = parseFloat(rateDraft);
               if (!Number.isFinite(n) || n < 0) {
-                alert('Enter a valid non-negative number');
+                tell('Enter a valid non-negative number');
                 return;
               }
               setRateSaving(true);
@@ -247,11 +248,11 @@ function AdminBookingsPageContent() {
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                  alert(data.error || 'Failed to save');
+                  tell(data.error || 'Failed to save');
                   return;
                 }
                 await mutateHallSettings();
-                alert(data.message || 'Sent for approval');
+                tell(data.message || 'Sent for approval');
               } finally {
                 setRateSaving(false);
               }

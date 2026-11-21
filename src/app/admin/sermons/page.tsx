@@ -1,4 +1,5 @@
 "use client";
+import { ask, tell } from '@/components/Dialog';
 import { useState, useMemo } from 'react';
 import useSWR from 'swr';
 import { PageHeader, ADMIN_BACK, Alert, DateChip, StatusBadge } from '@/components/ui';
@@ -11,10 +12,10 @@ export default function AdminSermonsPage() {
   const sermons: SermonRow[] = data?.list || [];
 
   const requestDelete = async (s: SermonRow) => {
-    if (!window.confirm(`Ask to remove the sermon "${s.title}"? A second administrator must approve before it disappears.`)) return;
+    if (!await ask(`Ask to remove the sermon "${s.title}"? A second administrator must approve before it disappears.`)) return;
     const res = await fetch(`/api/admin/sermons/${s.id}`, { method: 'DELETE' });
     const body = await res.json().catch(() => ({}));
-    alert(res.ok ? 'Removal sent for approval.' : body.error || 'Could not send the removal request.');
+    tell(res.ok ? 'Removal sent for approval.' : body.error || 'Could not send the removal request.');
     mutate();
   };
   const [title, setTitle] = useState('');

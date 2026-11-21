@@ -1,4 +1,5 @@
 'use client';
+import { ask, tell } from '@/components/Dialog';
 
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { useState, useEffect } from 'react';
@@ -167,7 +168,7 @@ export default function AdminProcessesPage() {
   const submitAdd = async (e: FormEvent) => {
     e.preventDefault();
     if (!addForm.title.trim() || !addForm.contentHtml.trim()) {
-      alert('Please fill in title and content');
+      tell('Please fill in title and content');
       return;
     }
     setAddSubmitting(true);
@@ -179,13 +180,12 @@ export default function AdminProcessesPage() {
         body: JSON.stringify(addForm),
       });
       if (res.status === 401 || res.status === 403) {
-        alert('Your session has expired or you need admin access.');
-        window.location.href = '/login';
+        tell('Your session has expired or you need admin access.').then(() => { window.location.href = '/login'; });
         return;
       }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(body.error || 'Failed to create process');
+        tell(body.error || 'Failed to create process');
         return;
       }
       const newId = typeof body.id === 'number' ? body.id : null;
@@ -211,11 +211,11 @@ export default function AdminProcessesPage() {
       setAddPendingFiles([]);
       await refreshList();
       if (uploadErrors.length) {
-        alert(
+        tell(
           `Process submitted for approval.\n\nSome files could not be uploaded:\n${uploadErrors.join('\n')}`
         );
       } else {
-        alert(
+        tell(
           hadFiles
             ? 'Process submitted for approval. Attached files were uploaded.'
             : 'Process submitted for approval.'
@@ -230,7 +230,7 @@ export default function AdminProcessesPage() {
     e.preventDefault();
     if (editId == null) return;
     if (!editForm.title.trim() || !editForm.contentHtml.trim()) {
-      alert('Please fill in title and content');
+      tell('Please fill in title and content');
       return;
     }
     setEditSubmitting(true);
@@ -245,12 +245,12 @@ export default function AdminProcessesPage() {
         }),
       });
       if (res.status === 401 || res.status === 403) {
-        alert('Admin access required.');
+        tell('Admin access required.');
         return;
       }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(body.error || 'Failed to submit update');
+        tell(body.error || 'Failed to submit update');
         return;
       }
       const filesToUpload = editPendingFiles;
@@ -276,14 +276,14 @@ export default function AdminProcessesPage() {
       setEditPendingRemoveIds([]);
       await refreshList();
       if (uploadErrors.length) {
-        alert(
+        tell(
           `Update request submitted for approval.\n\nSome new files could not be uploaded:\n${uploadErrors.join('\n')}`
         );
       } else {
         const parts = ['Update request submitted for approval.'];
         if (hadNewFiles) parts.push('New files were uploaded.');
         if (hadScheduledRemovals) parts.push('Marked files will be removed after approval.');
-        alert(parts.join(' '));
+        tell(parts.join(' '));
       }
       setEditId(null);
       setScreen('list');
@@ -293,20 +293,20 @@ export default function AdminProcessesPage() {
   };
 
   const requestDelete = async (p: ProcessRow) => {
-    if (!window.confirm(`Request deletion of "${p.title}"? This requires approval.`)) return;
+    if (!await ask(`Request deletion of "${p.title}"? This requires approval.`)) return;
     try {
       const res = await fetch(`/api/admin/processes/${p.id}`, { method: 'DELETE', credentials: 'same-origin' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(body.error || 'Failed');
+        tell(body.error || 'Failed');
         return;
       }
-      alert('Delete request submitted for approval');
+      tell('Delete request submitted for approval');
       setSelected(null);
       setScreen('list');
       await refreshList();
     } catch {
-      alert('Failed');
+      tell('Failed');
     }
   };
 
@@ -320,7 +320,7 @@ export default function AdminProcessesPage() {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(body.error || 'Upload failed');
+      tell(body.error || 'Upload failed');
       return;
     }
     await refreshList();
@@ -330,14 +330,14 @@ export default function AdminProcessesPage() {
   };
 
   const removeAttachment = async (processId: number, attachmentId: number) => {
-    if (!window.confirm('Remove this file from the process?')) return;
+    if (!await ask('Remove this file from the process?')) return;
     const res = await fetch(`/api/admin/processes/${processId}/attachments/${attachmentId}`, {
       method: 'DELETE',
       credentials: 'same-origin',
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      alert(body.error || 'Failed to remove');
+      tell(body.error || 'Failed to remove');
       return;
     }
     await refreshList();
@@ -561,7 +561,7 @@ export default function AdminProcessesPage() {
               style={{ width: '100%', height: '100%', textAlign: 'left', font: 'inherit', cursor: 'pointer', boxSizing: 'border-box' }}
               onClick={() => {
                 if (!isAdmin) {
-                  alert('Only administrators can add a new process.');
+                  tell('Only administrators can add a new process.');
                   return;
                 }
                 setAddPendingFiles([]);

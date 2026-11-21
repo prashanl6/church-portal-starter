@@ -1,4 +1,5 @@
 'use client';
+import { tell } from '@/components/Dialog';
 import useSWR, { useSWRConfig } from 'swr';
 import { PageHeader, ADMIN_BACK, StatusBadge, DateChip, RowChevron, longDate } from '@/components/ui';
 import { useEffect, useState } from 'react';
@@ -9,11 +10,10 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 async function showResult(res: Response, fallbackOk: string, fallbackErr: string): Promise<boolean> {
   const body = await res.json().catch(() => ({} as any));
   if (res.status === 401) {
-    alert('Your session has expired. Please log in again.');
-    window.location.href = '/login';
+    tell('Your session has expired. Please log in again.').then(() => { window.location.href = '/login'; });
     return false;
   }
-  alert(res.ok ? body.message || fallbackOk : body.error || fallbackErr);
+  tell(res.ok ? body.message || fallbackOk : body.error || fallbackErr);
   return res.ok;
 }
 
@@ -168,7 +168,7 @@ export default function PeopleEventsPage() {
   const submitAnniversary = async (e: React.FormEvent) => {
     e.preventDefault();
     if (anniversaryForm.individualAId === anniversaryForm.individualBId) {
-      alert('Choose two different individuals');
+      tell('Choose two different individuals');
       return;
     }
     const res = await fetch('/api/admin/anniversaries', {
@@ -238,7 +238,7 @@ export default function PeopleEventsPage() {
   const saveAnniversaryDetails = async (id: number) => {
     if (!anniversaryDraft) return;
     if (anniversaryDraft.individualAId === anniversaryDraft.individualBId) {
-      alert('Choose two different individuals');
+      tell('Choose two different individuals');
       return;
     }
     const res = await fetch(`/api/admin/anniversaries/${id}`, {
@@ -260,11 +260,11 @@ export default function PeopleEventsPage() {
 
   const loadBirthdayRange = () => {
     if (!birthdayFromInput.trim() || !birthdayToInput.trim()) {
-      alert('Enter both from and to dates.');
+      tell('Enter both from and to dates.');
       return;
     }
     if (birthdayFromInput > birthdayToInput) {
-      alert('From date must be on or before to date.');
+      tell('From date must be on or before to date.');
       return;
     }
     setBirthdayApplied({ from: birthdayFromInput, to: birthdayToInput });
@@ -272,11 +272,11 @@ export default function PeopleEventsPage() {
 
   const loadAnniversaryRange = () => {
     if (!anniversaryFromInput.trim() || !anniversaryToInput.trim()) {
-      alert('Enter both from and to dates.');
+      tell('Enter both from and to dates.');
       return;
     }
     if (anniversaryFromInput > anniversaryToInput) {
-      alert('From date must be on or before to date.');
+      tell('From date must be on or before to date.');
       return;
     }
     setAnniversaryApplied({ from: anniversaryFromInput, to: anniversaryToInput });

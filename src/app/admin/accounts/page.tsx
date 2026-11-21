@@ -1,4 +1,5 @@
 'use client';
+import { ask, tell } from '@/components/Dialog';
 import { useState } from 'react';
 import useSWR from 'swr';
 import { PageHeader, ADMIN_BACK, Alert, StatusBadge, longDate } from '@/components/ui';
@@ -34,10 +35,10 @@ export default function AccountsPage() {
   };
 
   const switchOff = async (a: Account) => {
-    if (!window.confirm(`Switch off ${a.name}'s account? They will no longer be able to log in. A second administrator must approve.`)) return;
+    if (!await ask(`Switch off ${a.name}'s account? They will no longer be able to log in. A second administrator must approve.`)) return;
     const res = await fetch(`/api/admin/users/${a.id}`, { method: 'DELETE' });
     const body = await res.json().catch(() => ({}));
-    alert(res.ok ? body.message : body.error || 'Could not send the request.');
+    tell(res.ok ? body.message : body.error || 'Could not send the request.');
     mutate();
   };
 
