@@ -370,9 +370,15 @@ main.container {
   gap: 0.6rem;
 }
 
-@media (min-width: 1100px) {
+/* Log out stays visible from tablet width; phones use the Menu sheet. */
+@media (min-width: 640px) {
   .user-info {
     display: flex;
+  }
+}
+@media (max-width: 1099px) {
+  .user-info .role-pill {
+    display: none;
   }
 }
 
