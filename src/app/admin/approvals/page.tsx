@@ -19,6 +19,7 @@ const TYPE_LABELS: Record<string, string> = {
   individual: 'Birthday register',
   anniversary: 'Wedding anniversary',
   hall_settings: 'Hall hire rate',
+  user: 'Account',
 };
 
 function ApprovalsPageContent() {
@@ -497,6 +498,7 @@ function actionLabel(a: any): string {
   if (a.action === 'approve') return 'Approve booking';
   if (a.action === 'delete' && a.resourceType === 'booking') return 'Delete booking';
   if (a.resourceType === 'church_bank_account' && a.action === 'update') return 'Update church bank account';
+  if (a.resourceType === 'user') return a.action === 'create' ? 'Add an account' : 'Switch off an account';
   const verbs: Record<string, string> = {
     create: 'Add new',
     update: 'Change',

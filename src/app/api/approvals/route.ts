@@ -232,6 +232,23 @@ export async function GET() {
         genericDetails: { heading: approval.action === 'create' ? 'Add a wedding anniversary' : 'Change a wedding anniversary', rows },
       };
     }
+    if (approval.resourceType === 'user') {
+      // Never send the password hash to the browser.
+      const { payloadJson: _p, comment1: _c, ...rest } = approval as any;
+      const target = approval.resourceId ? await prisma.user.findUnique({ where: { id: approval.resourceId } }) : null;
+      const who = target || payload || {};
+      return {
+        ...rest,
+        genericDetails: {
+          heading: approval.action === 'create' ? 'Add an account' : 'Switch off an account',
+          rows: [
+            ['Name', String(who.name || '')],
+            ['Email', String(who.email || '')],
+            ['Role', who.role === 'admin' ? 'Administrator (can make and approve changes)' : 'Staff (can view only)'],
+          ],
+        },
+      };
+    }
     if (approval.resourceType === 'hall_settings') {
       const current = await prisma.hallBookingSettings.findUnique({ where: { id: 1 } });
       return {

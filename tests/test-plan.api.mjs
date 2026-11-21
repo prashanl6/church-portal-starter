@@ -457,6 +457,32 @@ const ln = md.loans.find((l) => l.id === loan.data.id);
 ok(ln?.issuedAt && ln?.returnedAt && ln?.returned === true, 'dates recorded', j(ln));
 ok(md.items.find((i) => i.id === item.data.id)?.quantityAvailable === 1, '1 available again');
 
+// ---------------------------------------------------------------- ACC
+test('ACC-01', 'New accounts need a second administrator');
+const newEmail = `new.staff.${stamp}@example.com`;
+r = await call('/api/admin/users', { cookie: staff, method: 'POST', json: { name: 'X', email: 'x@example.com', role: 'staff', password: 'Password1' } });
+ok(r.status === 403, 'staff cannot add accounts', j(r.data));
+r = await call('/api/admin/users', { cookie: admin1, method: 'POST', json: { name: 'New Staff', email: newEmail, role: 'staff', password: 'Welcome@2026' } });
+ok(r.status === 200, 'admin requests a staff account', j(r.data));
+ok((await login(newEmail, 'Welcome@2026')).status === 401, 'cannot log in before approval');
+const accAp = (await pendingFor(admin1, 'user')).find((a) => JSON.stringify(a.genericDetails).includes(newEmail));
+ok(accAp && !JSON.stringify(accAp).includes('$2'), 'approval shows the account but never the password hash', j(accAp));
+ok((await approve(admin1, accAp?.id)).status === 403, 'maker cannot approve the account');
+ok((await approve(admin2, accAp?.id)).status === 200, 'admin2 approves');
+const newLogin = await login(newEmail, 'Welcome@2026');
+ok(newLogin.status === 200, 'the new person can log in');
+ok((await call('/api/admin/assets', { cookie: newLogin.cookie, method: 'POST', json: { reference: 'x', value: 1, quantity: 1, labelCategory: 'Chapel' } })).status === 403, 'new staff account is view-only');
+
+test('ACC-02', 'Switching off an account');
+const newId = (await call('/api/admin/users', { cookie: admin1 })).data.list.find((u) => u.email === newEmail)?.id;
+r = await call(`/api/admin/users/${newId}`, { cookie: admin1, method: 'DELETE' });
+ok(r.status === 200, 'switch-off sent for approval', j(r.data));
+ok((await login(newEmail, 'Welcome@2026')).status === 200, 'still works before approval');
+await approve(admin2, (await pendingFor(admin2, 'user')).find((a) => a.resourceId === newId)?.id);
+ok((await login(newEmail, 'Welcome@2026')).status === 401, 'cannot log in after approval');
+const admin1Id = (await call('/api/admin/users', { cookie: admin1 })).data.list.find((u) => u.email === 'admin1@example.com')?.id;
+ok((await call(`/api/admin/users/${admin1Id}`, { cookie: admin1, method: 'DELETE' })).status === 400, 'cannot switch off your own account');
+
 // ---------------------------------------------------------------- AUD
 test('AUD-01', 'Everything is logged');
 const audit = (await call('/api/admin/audit', { cookie: admin1 })).data.list;
@@ -483,7 +509,7 @@ const locked = await login('staff3@example.com', 'Staff@123');
 ok(locked.status === 429 && /15 minutes/i.test(locked.data?.message || locked.data?.error || ''), 'locked for 15 minutes', j(locked.data));
 
 // ---------------------------------------------------------------- report
-const order = ['SEC', 'FIN', 'AST', 'PPL', 'NTC', 'SRM', 'PRC', 'BKG', 'MED', 'AUD', 'PRF'];
+const order = ['SEC', 'FIN', 'AST', 'PPL', 'NTC', 'SRM', 'PRC', 'BKG', 'MED', 'ACC', 'AUD', 'PRF'];
 results.sort((a, b) => order.indexOf(a.id.slice(0, 3)) - order.indexOf(b.id.slice(0, 3)) || a.id.localeCompare(b.id));
 let failed = 0;
 for (const t of results) {

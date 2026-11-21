@@ -355,6 +355,35 @@ async function applyApproved(tx: Tx, a: Approval, payload: any): Promise<Outcome
       const after = await tx.weddingAnniversary.update({ where: { id }, data: anniversaryData(payload) });
       return { before, after };
     }
+
+    case 'user:create': {
+      const email = String(payload?.email || '').trim().toLowerCase();
+      const role = payload?.role === 'admin' ? 'admin' : 'staff';
+      if (!email || !payload?.passwordHash) throw new ApprovalError('This account request is incomplete.');
+      const exists = await tx.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
+      if (exists) throw new ApprovalError('An account with this email already exists.');
+      const created = await tx.user.create({
+        data: { name: String(payload.name || email), email, role, passwordHash: String(payload.passwordHash), status: 'active' },
+      });
+      // Drop the password hash from the request once it has been used.
+      await tx.approval.update({
+        where: { id: a.id },
+        data: { resourceId: created.id, payloadJson: JSON.stringify({ name: created.name, email, role }) },
+      });
+      const { passwordHash: _h, ...safe } = created;
+      return { after: safe, resourceId: created.id };
+    }
+    case 'user:disable': {
+      const before = await tx.user.findUnique({ where: { id } });
+      if (!before || before.status !== 'active') throw new ApprovalError('This account is not active.');
+      if (before.role === 'admin') {
+        const admins = await tx.user.count({ where: { role: 'admin', status: 'active' } });
+        // Dual control needs two administrators; never drop below that.
+        if (admins <= 2) throw new ApprovalError('At least two active administrators are needed, so this one cannot be switched off yet.');
+      }
+      await tx.user.update({ where: { id }, data: { status: 'disabled' } });
+      return { before: { email: before.email, role: before.role, status: before.status }, after: { status: 'disabled' } };
+    }
   }
   throw new ApprovalError(`Unknown request type: ${a.resourceType} / ${a.action}`);
 }
@@ -362,6 +391,14 @@ async function applyApproved(tx: Tx, a: Approval, payload: any): Promise<Outcome
 async function applyRejected(tx: Tx, a: Approval, comment: string): Promise<Outcome> {
   const id = a.resourceId;
   switch (`${a.resourceType}:${a.action}`) {
+    case 'user:create': {
+      const p = readPayload(a) || {};
+      await tx.approval.update({
+        where: { id: a.id },
+        data: { payloadJson: JSON.stringify({ name: p.name, email: p.email, role: p.role }) },
+      });
+      return {};
+    }
     case 'asset:create':
       await tx.asset.updateMany({ where: { id }, data: { status: 'rejected' } });
       return {};

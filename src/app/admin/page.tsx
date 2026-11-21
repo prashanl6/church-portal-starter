@@ -26,6 +26,7 @@ const SECTIONS = [
   { href: '/admin/medical', title: 'Medical equipment', text: 'Lend and track wheelchairs and aids.', icon: <IconHeart />, tint: ['#f7e9ea', '#a2434c'] },
   { href: '/admin/processes', title: 'Processes', text: 'Guides and forms for church activities.', icon: <IconBook />, tint: ['#e7f1f3', '#3e7480'] },
   { href: '/admin/church-bank-account', title: 'Bank account details', text: 'Details shown to people paying for bookings.', icon: <IconBank />, tint: ['#eef0f7', '#4a5a8c'] },
+  { href: '/admin/accounts', title: 'Accounts', text: 'Add or switch off staff and administrator logins.', icon: <IconPeople />, tint: ['#eef0f7', '#4a5a8c'] },
   { href: '/admin/audit', title: 'Audit log', text: 'A record of every change and approval.', icon: <IconList />, tint: ['#f1f0ec', '#66645c'] },
 ];
 

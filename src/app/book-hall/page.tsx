@@ -148,7 +148,7 @@ export default function BookHallPage() {
           <input
             id="bk-lookup"
             className="input"
-            placeholder="For example: BA5TPPHJH"
+            placeholder="For example: B7K2M9QPA"
             value={lookupRef}
             onChange={(e) => setLookupRef(e.target.value)}
             autoCapitalize="characters"

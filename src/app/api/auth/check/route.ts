@@ -11,9 +11,13 @@ export async function GET() {
   // Fetch user details from database to get name
   const userDetails = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { name: true, email: true, role: true }
+    select: { name: true, email: true, role: true, status: true }
   });
-  
+  // A switched-off account counts as logged out.
+  if (!userDetails || userDetails.status !== 'active') {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
+
   return NextResponse.json({ 
     authenticated: true, 
     role: user.role,

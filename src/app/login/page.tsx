@@ -13,8 +13,9 @@ export default function LoginPage() {
   const [msgDetail, setMsgDetail] = useState('');
 
   const [bootstrapEligible, setBootstrapEligible] = useState(false);
+  const [adminsNeeded, setAdminsNeeded] = useState(2);
   const [bootstrapSecret, setBootstrapSecret] = useState('');
-  const [bootstrapName, setBootstrapName] = useState('Administrator');
+  const [bootstrapName, setBootstrapName] = useState('');
   const [bootstrapEmail, setBootstrapEmail] = useState('');
   const [bootstrapPassword, setBootstrapPassword] = useState('');
   const [bootstrapMsg, setBootstrapMsg] = useState('');
@@ -26,6 +27,7 @@ export default function LoginPage() {
       try {
         const res = await fetch('/api/auth/bootstrap-eligible');
         const data = await res.json().catch(() => ({}));
+        if (!cancelled && typeof data.adminsNeeded === 'number') setAdminsNeeded(data.adminsNeeded);
         if (!cancelled && data.eligible === true) {
           setBootstrapEligible(true);
         }
@@ -74,10 +76,20 @@ export default function LoginPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setBootstrapEligible(false);
-        setBootstrapMsg('Administrator account created. Sign in below with that email and password.');
-        setEmail((data as { email?: string }).email || bootstrapEmail.trim());
-        setPassword('');
+        const left = adminsNeeded - 1;
+        setAdminsNeeded(left);
+        setBootstrapEmail('');
+        setBootstrapPassword('');
+        setBootstrapName('');
+        setBootstrapMsg(
+          left > 0
+            ? 'Administrator created. Now create the second administrator (a different person): every change needs a second admin to approve it.'
+            : 'Both administrators are ready. Log in below.'
+        );
+        if (left <= 0) {
+          setEmail((data as { email?: string }).email || '');
+          setPassword('');
+        }
       } else {
         setBootstrapMsg(typeof data.error === 'string' ? data.error : 'Setup failed');
       }
@@ -101,14 +113,19 @@ export default function LoginPage() {
 
   return (
     <div style={{ maxWidth: '30rem', marginLeft: 'auto', marginRight: 'auto', paddingTop: '1.5rem' }}>
-      {bootstrapEligible && (
+      {bootstrapEligible && adminsNeeded <= 0 && bootstrapMsg && (
+        <div className="alert alert-success" style={{ marginBottom: '1.25rem' }}>{bootstrapMsg}</div>
+      )}
+      {bootstrapEligible && adminsNeeded > 0 && (
         <div className="card" style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 0, marginBottom: '0.5rem' }}>
             First-time setup
           </h2>
           <p style={{ ...infoStyle, marginTop: 0 }}>
-            No staff accounts exist yet and <strong>BOOTSTRAP_ADMIN_SECRET</strong> is set in this environment. Create
-            the first administrator here, then remove that env variable from Vercel and redeploy.
+            This new site needs <strong>two administrators</strong>, because every change is approved by a second
+            person. {adminsNeeded === 2 ? 'Create the first one here, then the second.' : 'Now create the second one.'}{' '}
+            You need the <strong>BOOTSTRAP_ADMIN_SECRET</strong> value from Vercel. Staff accounts are added later
+            under Admin → Accounts.
           </p>
           <form onSubmit={onBootstrap} style={{ display: 'grid', gap: '0.75rem' }}>
             <div>
