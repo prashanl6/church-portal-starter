@@ -71,7 +71,6 @@ export default function Header() {
   }, [menuOpen]);
 
   const handleLogout = async () => {
-    if (!window.confirm('Do you want to log out?')) return;
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
     } finally {
