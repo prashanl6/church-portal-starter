@@ -1359,7 +1359,7 @@ nav a {
 }
 
 .date-chip b { font-size: 1.35rem; font-weight: 700; }
-.date-chip small { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.date-chip small { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Status badges */
 .badge {

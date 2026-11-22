@@ -118,7 +118,8 @@ ok(!JSON.stringify(av).match(/@|phone|requesterName|purpose/i), 'the calendar sh
 test('PUB-03', 'Visitor: booking checks', 'Visitor');
 const day = '2027-03-06';
 const base = { fullName: 'Test Visitor', email: 'visitor@example.com', phone: '0771112233', purpose: 'Family lunch', date: day, startTime: '10:00', endTime: '11:00', hall: 'Main Hall' };
-const book = (over) => call('/api/bookings/request', { method: 'POST', json: { ...base, ...over } });
+let bookN = 0;
+const book = (over) => call('/api/bookings/request', { method: 'POST', json: { ...base, email: `visitor${++bookN}@example.com`, ...over } });
 r = await book({}); ok(r.status === 200 && r.data.amount === 3000, 'one hour costs 2 blocks = LKR 3,000', j(r.data));
 const ref1 = r.data.bookingRef;
 r = await book({ startTime: '12:00', endTime: '12:30' }); ok(r.status === 200 && r.data.amount === 1500, '30 minutes costs LKR 1,500', j(r.data));
@@ -140,6 +141,12 @@ for (const [label, over, rx] of [
   const x = await book(over);
   ok(x.status === 400 && rx.test(x.data.error || ''), `refused: ${label}`, `${x.status} ${j(x.data)}`);
 }
+
+test('PUB-05', 'Visitor: the booking form cannot be flooded', 'Visitor');
+let flood = [];
+for (let i = 0; i < 9; i++) flood.push((await call('/api/bookings/request', { method: 'POST', json: { ...base, email: 'flood@example.com', date: '2027-06-0' + (1 + (i % 9)) } })).status);
+ok(flood.slice(0, 8).every((x) => x === 200), 'the first 8 requests from one address in an hour are accepted', flood.join());
+ok(flood[8] === 429, 'the 9th is refused with a "please wait" message (429)', flood.join());
 
 test('PUB-04', 'Visitor: booking page lookup', 'Visitor');
 r = await call(`/api/bookings/${ref1}`);
@@ -477,7 +484,7 @@ ok(/no-store/i.test(r.headers.get('cache-control') || '') && /nosniff/i.test(r.h
 
 // =============================================================== BKG  more booking cases
 const bookingRow = async (ref) => (await call('/api/admin/bookings', { cookie: admin1 })).data.list.find((b) => b.bookingRef === ref);
-const reqBooking = (over = {}) => call('/api/bookings/request', { method: 'POST', json: { ...base, date: '2027-04-10', ...over } });
+const reqBooking = (over = {}) => call('/api/bookings/request', { method: 'POST', json: { ...base, email: `visitor${++bookN}@example.com`, date: '2027-04-10', ...over } });
 
 test('BKG-13', 'Remove a booking request (needs a second administrator)', 'Administrator A, Administrator B, Staff, Visitor');
 r = await reqBooking({ startTime: '08:00', endTime: '09:00' });

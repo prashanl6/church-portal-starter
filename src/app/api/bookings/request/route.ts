@@ -45,6 +45,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Please choose today or a future date.' }, { status: 400 });
   }
 
+  // Spam guard for this open form: a few requests per person per hour, and a cap for the whole site.
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const [fromThisEmail, fromAnyone] = await Promise.all([
+    prisma.booking.count({ where: { createdAt: { gte: hourAgo }, email: { equals: email, mode: 'insensitive' } } }),
+    prisma.booking.count({ where: { createdAt: { gte: hourAgo } } }),
+  ]);
+  if (fromThisEmail >= 8 || fromAnyone >= 200) {
+    return NextResponse.json(
+      { error: 'We have received a lot of requests just now. Please wait a little while and try again, or call the church office.' },
+      { status: 429 }
+    );
+  }
+
   // Clashes with bookings that are approved (waiting for payment) or paid.
   const clash = await findBookingClash(prisma, { hall, date: day, startTime, endTime });
   if (clash) {

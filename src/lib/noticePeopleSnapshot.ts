@@ -126,13 +126,13 @@ function buildSnapshotHtmlFromData(
   ${
     birthdayItems
       ? `<ul style="margin:0 0 1rem 1.1rem;padding:0;">${birthdayItems}</ul>`
-      : '<p style="margin:0 0 1rem 0;color:#64748b;font-size:0.95rem;">No birthdays in this period.</p>'
+      : '<p style="margin:0 0 1rem 0;color:#475569;font-size:1rem;">No birthdays in this period.</p>'
   }
   <h3 style="font-size:1.1rem;margin-bottom:0.5rem;">Anniversaries this week</h3>
   ${
     annItems
       ? `<ul style="margin:0;padding:0 0 0 1.1rem;">${annItems}</ul>`
-      : '<p style="margin:0;color:#64748b;font-size:0.95rem;">No anniversaries in this period.</p>'
+      : '<p style="margin:0;color:#475569;font-size:1rem;">No anniversaries in this period.</p>'
   }
 </div>`.trim();
 

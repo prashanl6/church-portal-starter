@@ -94,6 +94,8 @@ npm test                        # in another
 
 `npm test` first **wipes and re-seeds the local test database** (`scripts/reset-test-db.js`), so it refuses to run unless `DATABASE_URL` and `BASE_URL` both point at localhost. It creates test records and switches off two demo administrators. The suites are `tests/test-plan.api.mjs` (the original plan) and `tests/full-coverage.api.mjs` (role matrix and the rest); both use the helpers in `tests/lib.mjs`. Never run them against the live site.
 
+`npm run test:live` runs read-only checks against the live site (it never logs in or changes anything). Before launch, follow [docs/GO_LIVE_CHECKLIST.md](docs/GO_LIVE_CHECKLIST.md).
+
 ## Reference data
 
 `npm run seed:reference` adds what a new site needs: the hall rate (LKR 1,500 per 30 minutes), ten process guides (two with Excel templates) and a welcome notice. It only adds what is missing and never changes what admins have set. Production builds run it automatically.

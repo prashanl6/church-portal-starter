@@ -97,6 +97,8 @@ Booking and other notifications need a working SMTP configuration:
 | `NEXT_PUBLIC_BASE_URL` | Public site URL (browser-visible, e.g. links). |
 | `BASE_URL` | Server-side base URL for emails and internal URLs. |
 | `CRON_SECRET` | Optional. When set, only callers with this `Bearer` token can run the booking auto-cancel job. |
+| `CHURCH_OFFICE_EMAIL` | Optional. Receives a short notice whenever a new hall booking request arrives. |
+| `CLEAR_SAMPLE_DATA` | One-time, before launch only: set to `delete-all-sample-data` for one production deploy to remove sample people, notices, sermons, bookings, assets and medical records. Then delete it. See `docs/GO_LIVE_CHECKLIST.md`. |
 | `BOOKING_TIMEZONE` | IANA zone for hall booking times (e.g. `Asia/Colombo`); used for payment-deadline logic. |
 
 Copy `.env.example` and fill in real values; never commit `.env`.
@@ -241,6 +243,9 @@ Deploying runs migrations and adds reference data (hall rate, process guides, we
 `src/lib/databaseUrl.js` picks, in order: `CHURCH_DATABASE_URL`, a database connected through **Vercel → Storage** (its `…_POSTGRES_PRISMA_URL` / `…_DATABASE_URL` variables, with or without a prefix such as `STORAGE_`), then `DATABASE_URL`. Migrations use the direct (`…_UNPOOLED` / `…_NON_POOLING`) connection. The build log prints which setting is in use and, if the connection fails, why (see `scripts/db-check.js`).
 
 ---
+
+- **Before launch**, work through [docs/GO_LIVE_CHECKLIST.md](docs/GO_LIVE_CHECKLIST.md).
+- **Live check anytime**: `npm run test:live` runs read-only checks against the live site.
 
 ## 9. Related files in the repo
 

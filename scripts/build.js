@@ -67,6 +67,8 @@ if (!skipMigrations) {
   run('node scripts/migrate-legacy-people-event.js');
   // Adds missing reference data (hall rate, process guides, welcome notice); never overwrites.
   run('node scripts/seed-reference-data.js');
+  // One-time pre-launch cleanup; does nothing unless CLEAR_SAMPLE_DATA is set to its confirmation phrase.
+  if (process.env.CLEAR_SAMPLE_DATA) run('node scripts/clear-sample-data.js');
 }
 
 run('npx next build');
