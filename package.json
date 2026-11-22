@@ -13,7 +13,8 @@
     "seed:extra-users": "node scripts/seed-extra-staff-admins.js",
     "test": "node tests/run-all.mjs",
     "seed:reference": "node scripts/seed-reference-data.js",
-    "test:reset": "node scripts/reset-test-db.js"
+    "test:reset": "node scripts/reset-test-db.js",
+    "test:live": "node tests/live-smoke.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
