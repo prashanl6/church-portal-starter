@@ -19,7 +19,8 @@ export async function GET() {
   }
 
   return NextResponse.json({ 
-    authenticated: true, 
+    authenticated: true,
+    id: user.id,
     role: user.role,
     email: user.email,
     name: userDetails?.name || user.email.split('@')[0]

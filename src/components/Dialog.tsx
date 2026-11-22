@@ -3,13 +3,21 @@
 // phone in-app browsers (and then confirm() silently returns false), so the site never uses them.
 //   if (!(await ask('Remove this notice?'))) return;
 //   tell('Saved.');
+//   const note = await askText('Condition on return?');   // null when cancelled
 import { useEffect, useRef, useState } from 'react';
 
-type Req = { message: string; confirm: boolean; resolve: (ok: boolean) => void };
+type Req = { message: string; confirm: boolean; input?: boolean; resolve: (ok: boolean, text?: string) => void };
 let show: ((r: Req) => void) | null = null;
 
 export function ask(message: string): Promise<boolean> {
   return new Promise((resolve) => (show ? show({ message, confirm: true, resolve }) : resolve(false)));
+}
+
+/** Asks for a line of text. Resolves to the text, or null if cancelled. */
+export function askText(message: string): Promise<string | null> {
+  return new Promise((resolve) =>
+    show ? show({ message, confirm: true, input: true, resolve: (ok, text) => resolve(ok ? text ?? '' : null) }) : resolve(null)
+  );
 }
 
 export function tell(message: string): Promise<void> {
@@ -20,6 +28,7 @@ export function tell(message: string): Promise<void> {
 export function DialogHost() {
   const [queue, setQueue] = useState<Req[]>([]);
   const okRef = useRef<HTMLButtonElement>(null);
+  const textRef = useRef<HTMLInputElement>(null);
   const current = queue[0];
 
   useEffect(() => {
@@ -31,7 +40,7 @@ export function DialogHost() {
 
   useEffect(() => {
     if (!current) return;
-    okRef.current?.focus();
+    (current.input ? textRef.current : okRef.current)?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close(false);
     };
@@ -43,7 +52,7 @@ export function DialogHost() {
   if (!current) return null;
 
   function close(ok: boolean) {
-    current.resolve(ok);
+    current.resolve(ok, textRef.current?.value);
     setQueue((q) => q.slice(1));
   }
 
@@ -59,6 +68,17 @@ export function DialogHost() {
         <p id="dialog-message" className="dialog-message">
           {current.message}
         </p>
+        {current.input && (
+          <input
+            ref={textRef}
+            className="input"
+            style={{ marginBottom: '1.25rem' }}
+            aria-labelledby="dialog-message"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') close(true);
+            }}
+          />
+        )}
         <div className="dialog-actions">
           {current.confirm && (
             <button type="button" className="btn-secondary" onClick={() => close(false)}>
@@ -66,7 +86,7 @@ export function DialogHost() {
             </button>
           )}
           <button type="button" className="btn" ref={okRef} onClick={() => close(true)}>
-            {current.confirm ? 'Yes, continue' : 'OK'}
+            {current.input ? 'Save' : current.confirm ? 'Yes, continue' : 'OK'}
           </button>
         </div>
       </div>

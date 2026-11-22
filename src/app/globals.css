@@ -1226,7 +1226,12 @@ nav a {
 /* ---------- Shared page parts (used by src/components/ui.tsx) ---------- */
 .page {
   display: grid;
+  /* minmax(0, 1fr): a wide child (editor toolbar, long title) must never stretch the page past the screen */
+  grid-template-columns: minmax(0, 1fr);
   gap: 2rem;
+}
+.page > * {
+  min-width: 0;
 }
 
 .page-head {

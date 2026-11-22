@@ -1,5 +1,5 @@
 'use client';
-import { tell } from '@/components/Dialog';
+import { tell, askText } from '@/components/Dialog';
 import useSWR from 'swr';
 import { useState } from 'react';
 import { PageHeader, ADMIN_BACK, EmptyState, SkeletonList, longDate } from '@/components/ui';
@@ -9,6 +9,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 export default function MedicalEquipmentPage() {
   const { data, mutate } = useSWR('/api/admin/medical', fetcher);
+  const { data: me } = useSWR('/api/auth/check', fetcher);
   const [form, setForm] = useState({ name: '', quantityTotal: 0, notes: '' });
   const [loanForm, setLoanForm] = useState({ itemId: 0, givenTo: '', dueDate: '' });
 
@@ -59,7 +60,8 @@ export default function MedicalEquipmentPage() {
     if (res.ok) {
       mutate();
     } else {
-      tell('Failed to approve loan');
+      const body = await res.json().catch(() => ({}));
+      tell(body.error || 'Failed to approve loan');
     }
   };
 
@@ -68,7 +70,8 @@ export default function MedicalEquipmentPage() {
     if (res.ok) {
       mutate();
     } else {
-      tell('Failed to issue loan');
+      const body = await res.json().catch(() => ({}));
+      tell(body.error || 'Failed to issue loan');
     }
   };
 
@@ -81,7 +84,8 @@ export default function MedicalEquipmentPage() {
     if (res.ok) {
       mutate();
     } else {
-      tell('Failed to return loan');
+      const body = await res.json().catch(() => ({}));
+      tell(body.error || 'Failed to return loan');
     }
   };
 
@@ -180,15 +184,15 @@ export default function MedicalEquipmentPage() {
                     )}
                   </div>
                   <span className={`badge ${tone}`}>{label}</span>
-                  {!loan.approvedByAdminId && (
+                  {!loan.approvedByAdminId && loan.givenByUserId !== me?.id && (
                     <button className="btn btn-sm admin-only" onClick={() => approveLoan(loan.id)}>Approve</button>
                   )}
                   {loan.approvedByAdminId && !loan.issuedAt && (
                     <button className="btn btn-sm" onClick={() => issueLoan(loan.id)}>Issue</button>
                   )}
                   {loan.issuedAt && !loan.returned && (
-                    <button className="btn-secondary btn-sm" onClick={() => {
-                      const condition = prompt('Condition on return:');
+                    <button className="btn-secondary btn-sm" onClick={async () => {
+                      const condition = await askText('What condition is it in? (for example: good, needs cleaning)');
                       if (condition !== null) returnLoan(loan.id, condition);
                     }}>Mark Returned</button>
                   )}

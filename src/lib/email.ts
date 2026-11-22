@@ -36,6 +36,11 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Visitor-typed text must never be able to add HTML or links to an email. */
+function safeBooking(b: BookingDetails): BookingDetails {
+  return { ...b, requesterName: escapeHtml(b.requesterName), hall: escapeHtml(b.hall), purpose: escapeHtml(b.purpose), phone: escapeHtml(b.phone), paymentRef: b.paymentRef ? escapeHtml(b.paymentRef) : b.paymentRef };
+}
+
 export interface BookingDetails {
   bookingRef: string;
   requesterName: string;
@@ -50,7 +55,8 @@ export interface BookingDetails {
   paymentRef?: string;
 }
 
-export async function sendBookingSubmissionEmail(booking: BookingDetails) {
+export async function sendBookingSubmissionEmail(bookingIn: BookingDetails) {
+  const booking = safeBooking(bookingIn);
   const bookingDate = new Date(booking.date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -107,6 +113,16 @@ export async function sendBookingSubmissionEmail(booking: BookingDetails) {
       subject: `Booking Request Submitted - ${booking.bookingRef}`,
       html,
     });
+    // Tell the church office a request is waiting (set CHURCH_OFFICE_EMAIL; otherwise the Admin badge is the only sign).
+    const office = process.env.CHURCH_OFFICE_EMAIL?.trim();
+    if (office) {
+      await send({
+        from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+        to: office,
+        subject: `New hall booking request - ${booking.bookingRef}`,
+        html: `<p>A new hall booking request is waiting for approval.</p><p><strong>${booking.requesterName}</strong> (${booking.phone})<br>${booking.hall}, ${bookingDate}, ${booking.startTime} - ${booking.endTime}<br>${booking.purpose}</p><p>Open the website, then Admin, then Approvals.</p>`,
+      });
+    }
     return true;
   } catch (error) {
     console.error('Error sending booking submission email:', error);
@@ -114,7 +130,8 @@ export async function sendBookingSubmissionEmail(booking: BookingDetails) {
   }
 }
 
-export async function sendBookingApprovalEmail(booking: BookingDetails, baseUrl: string = 'http://localhost:3001') {
+export async function sendBookingApprovalEmail(bookingIn: BookingDetails, baseUrl: string = 'http://localhost:3001') {
+  const booking = safeBooking(bookingIn);
   const bookingDate = new Date(booking.date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -203,7 +220,8 @@ export async function sendBookingApprovalEmail(booking: BookingDetails, baseUrl:
   }
 }
 
-export async function sendBookingRejectionEmail(booking: BookingDetails, rejectReason: string) {
+export async function sendBookingRejectionEmail(bookingIn: BookingDetails, rejectReason: string) {
+  const booking = safeBooking(bookingIn);
   const bookingDate = new Date(booking.date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -245,7 +263,7 @@ export async function sendBookingRejectionEmail(booking: BookingDetails, rejectR
           
           <div class="reject-reason">
             <h3>Reason for Rejection:</h3>
-            <p>${rejectReason}</p>
+            <p>${escapeHtml(rejectReason)}</p>
           </div>
           
           <p>If you have any questions or would like to discuss this further, please contact us.</p>
@@ -272,7 +290,8 @@ export async function sendBookingRejectionEmail(booking: BookingDetails, rejectR
   }
 }
 
-export async function sendBookingPaymentConfirmedEmail(booking: BookingDetails) {
+export async function sendBookingPaymentConfirmedEmail(bookingIn: BookingDetails) {
+  const booking = safeBooking(bookingIn);
   const bookingDate = new Date(booking.date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -338,7 +357,8 @@ export async function sendBookingPaymentConfirmedEmail(booking: BookingDetails) 
   }
 }
 
-export async function sendBookingAutoCancelledEmail(booking: BookingDetails) {
+export async function sendBookingAutoCancelledEmail(bookingIn: BookingDetails) {
+  const booking = safeBooking(bookingIn);
   const bookingDate = new Date(booking.date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
