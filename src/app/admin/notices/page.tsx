@@ -61,7 +61,7 @@ export default function NoticesAdminPage() {
         title="Write a notice"
         subtitle="When you submit, a second administrator checks the notice before it appears on the website."
       />
-      <form onSubmit={submit} className="card panel-enter form-grid two">
+      <form onSubmit={submit} className="card panel-enter form-grid two admin-only">
         <div>
           <label className="label" htmlFor="notice-title">Title</label>
           <input
@@ -113,7 +113,7 @@ export default function NoticesAdminPage() {
                 </span>
                 <StatusBadge status={n.status} />
                 {n.status === 'published' && (
-                  <button type="button" className="btn-quiet danger" onClick={() => requestDelete(n)}>
+                  <button type="button" className="btn-quiet danger admin-only" onClick={() => requestDelete(n)}>
                     Remove
                   </button>
                 )}

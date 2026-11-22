@@ -8,57 +8,7 @@
  * sample files in tests/fixtures/. Never run it against the live site.
  * Prints one line per test ID and a summary; exits 1 if any test fails.
  */
-import { readFileSync } from 'fs';
-
-const BASE = process.env.BASE_URL || 'http://localhost:3000';
-if (!/localhost|127\.0\.0\.1/.test(BASE)) {
-  console.error('Refusing to run: this suite creates test data and must only target a local site.');
-  process.exit(2);
-}
-const FIX = new URL('./fixtures/', import.meta.url);
-const results = [];
-let current = null;
-
-function test(id, title) {
-  current = { id, title, checks: [] };
-  results.push(current);
-}
-function ok(cond, label, extra = '') {
-  current.checks.push({ pass: !!cond, label, extra: cond ? '' : extra });
-}
-
-async function call(path, { cookie, method = 'GET', json, form } = {}) {
-  const headers = {};
-  if (cookie) headers.cookie = cookie;
-  let body;
-  if (json !== undefined) {
-    headers['content-type'] = 'application/json';
-    body = JSON.stringify(json);
-  } else if (form) body = form;
-  const res = await fetch(BASE + path, { method, headers, body, redirect: 'manual' });
-  const text = await res.text();
-  let data = null;
-  try { data = JSON.parse(text); } catch { data = text; }
-  return { status: res.status, data, headers: res.headers };
-}
-
-async function login(email, password) {
-  const res = await fetch(BASE + '/api/auth/login', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const m = (res.headers.get('set-cookie') || '').match(/token=[^;]+/);
-  return { status: res.status, cookie: m ? m[0] : null, data: await res.json().catch(() => null) };
-}
-
-const file = (name, type) => new Blob([readFileSync(new URL(name, FIX))], { type });
-const j = (x) => String(JSON.stringify(x) ?? x).slice(0, 300);
-const pendingFor = async (cookie, type) =>
-  (await call('/api/approvals', { cookie })).data.list.filter((a) => a.status === 'SUBMITTED' && a.resourceType === type);
-const approve = (cookie, approvalId) => call('/api/approvals/approve', { cookie, method: 'POST', json: { approvalId } });
-const reject = (cookie, approvalId, comment) => call('/api/approvals/reject', { cookie, method: 'POST', json: { approvalId, comment } });
-const ymd = (d) => d.toISOString().slice(0, 10);
+import { BASE, test, use, ok, call, login, file, j, pendingFor, approve, reject, ymd, finish } from './lib.mjs';
 
 // ---------------------------------------------------------------- SEC
 test('SEC-01', 'Every account can log in');
@@ -107,12 +57,12 @@ ok(bankAp && bankAp.isMine === true && bankAp.canAct === false, 'maker sees "You
 ok((await approve(admin1, bankAp?.id)).status === 403, 'maker approval is refused');
 
 // SEC-05 continues: staff sees the item but cannot act
-current = results.find((t) => t.id === 'SEC-05');
+use('SEC-05');
 const staffView = (await pendingFor(staff, 'church_bank_account'))[0];
 ok(staffView && staffView.canAct === false, 'staff can see pending items without approve rights', j(staffView));
 ok((await approve(staff, bankAp?.id)).status === 403, 'staff approval is refused');
 
-current = results.find((t) => t.id === 'FIN-02');
+use('FIN-02');
 test('FIN-03', 'Checker approves');
 r = await approve(admin2, bankAp?.id);
 ok(r.status === 200, 'admin2 approves', `${r.status} ${j(r.data)}`);
@@ -509,17 +459,4 @@ const locked = await login('staff3@example.com', 'Staff@123');
 ok(locked.status === 429 && /15 minutes/i.test(locked.data?.message || locked.data?.error || ''), 'locked for 15 minutes', j(locked.data));
 
 // ---------------------------------------------------------------- report
-const order = ['SEC', 'FIN', 'AST', 'PPL', 'NTC', 'SRM', 'PRC', 'BKG', 'MED', 'ACC', 'AUD', 'PRF'];
-results.sort((a, b) => order.indexOf(a.id.slice(0, 3)) - order.indexOf(b.id.slice(0, 3)) || a.id.localeCompare(b.id));
-let failed = 0;
-for (const t of results) {
-  const bad = t.checks.filter((c) => !c.pass);
-  if (bad.length) failed++;
-  console.log(`${bad.length ? 'FAIL' : 'PASS'}  ${t.id}  ${t.title}  (${t.checks.length - bad.length}/${t.checks.length})`);
-  for (const c of bad) console.log(`        ✗ ${c.label}${c.extra ? `  -> ${c.extra}` : ''}`);
-}
-console.log(`\n${results.length - failed} of ${results.length} test cases passed.`);
-if (process.env.RESULTS_JSON) {
-  (await import('fs')).writeFileSync(process.env.RESULTS_JSON, JSON.stringify(results, null, 2));
-}
-process.exit(failed ? 1 : 0);
+await finish(['SEC', 'FIN', 'AST', 'PPL', 'NTC', 'SRM', 'PRC', 'BKG', 'MED', 'ACC', 'AUD', 'PRF']);

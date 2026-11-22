@@ -16,7 +16,7 @@ const includePeople = {
 };
 
 export async function GET(req: Request) {
-  const u = requireRole(['admin', 'staff']);
+  const u = await requireRole(['admin', 'staff']);
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }
@@ -121,7 +121,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const u = g.user;
 

@@ -65,7 +65,7 @@ export default function AccountsPage() {
                 </span>
               </span>
               {a.status === 'active' ? (
-                <button type="button" className="btn-quiet danger" onClick={() => switchOff(a)}>
+                <button type="button" className="btn-quiet danger admin-only" onClick={() => switchOff(a)}>
                   Switch off
                 </button>
               ) : (
@@ -81,7 +81,7 @@ export default function AccountsPage() {
         ) : null}
       </section>
 
-      <form onSubmit={submit} className="card form-grid two">
+      <form onSubmit={submit} className="card form-grid two admin-only">
         <h2 className="section-label span-2" style={{ margin: 0 }}>Add an account</h2>
         <div>
           <label className="label" htmlFor="acc-name">Full name</label>

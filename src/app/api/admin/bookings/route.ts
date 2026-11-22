@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth';
 import { storedFileUrl } from '@/lib/storedFiles';
 
 export async function GET() {
-  const u = requireRole(['admin', 'staff']);
+  const u = await requireRole(['admin', 'staff']);
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }

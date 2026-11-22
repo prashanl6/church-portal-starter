@@ -1580,3 +1580,20 @@ nav a {
     animation: none;
   }
 }
+
+/* Staff accounts can view but not change: hide the controls only administrators can use. */
+html[data-role='staff'] .admin-only {
+  display: none !important;
+}
+.staff-banner {
+  display: none;
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--text-2);
+  font-size: 1rem;
+}
+html[data-role='staff'] .staff-banner {
+  display: block;
+}

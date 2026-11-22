@@ -268,7 +268,7 @@ export default function AssetsPage() {
         subtitle="The church's property and equipment. New items and changes go live after a second administrator approves them."
       />
 
-      <form onSubmit={submit} className={`card ${editingId ? 'panel-enter' : ''}`}>
+      <form onSubmit={submit} className={`card admin-only ${editingId ? 'panel-enter' : ''}`}>
         <h2 className="section-label">{editingId ? 'Change this asset' : 'Add an asset'}</h2>
         <div className="form-grid two">
           <div className="span-2" style={{ position: 'relative' }}>
@@ -376,9 +376,9 @@ export default function AssetsPage() {
                   {!isPendingDelete && (
                     <div style={{ display: 'flex', gap: '0.25rem' }}>
                       {!isPendingUpdate && (
-                        <button onClick={() => edit(a)} className="btn-quiet">Edit</button>
+                        <button onClick={() => edit(a)} className="btn-quiet admin-only">Edit</button>
                       )}
-                      <button onClick={() => handleDelete(a.id, a.reference)} className="btn-quiet danger">Delete</button>
+                      <button onClick={() => handleDelete(a.id, a.reference)} className="btn-quiet danger admin-only">Delete</button>
                     </div>
                   )}
                 </div>
@@ -450,10 +450,10 @@ export default function AssetsPage() {
                       </div>
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
                         {firstAsset && (
-                          <button onClick={() => edit(firstAsset)} className="btn-quiet">Edit</button>
+                          <button onClick={() => edit(firstAsset)} className="btn-quiet admin-only">Edit</button>
                         )}
                         {assetIds.length > 0 && (
-                          <button onClick={handleDeleteSummed} className="btn-quiet danger">Delete</button>
+                          <button onClick={handleDeleteSummed} className="btn-quiet danger admin-only">Delete</button>
                         )}
                       </div>
                     </div>

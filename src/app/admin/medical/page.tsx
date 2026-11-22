@@ -130,7 +130,7 @@ export default function MedicalEquipmentPage() {
         </form>
 
         {/* Create Item Form */}
-        <form onSubmit={submitItem} className="card">
+        <form onSubmit={submitItem} className="card admin-only">
           <h2 className="section-label">Add a new item</h2>
           <div className="form-grid">
             <div>
@@ -181,7 +181,7 @@ export default function MedicalEquipmentPage() {
                   </div>
                   <span className={`badge ${tone}`}>{label}</span>
                   {!loan.approvedByAdminId && (
-                    <button className="btn btn-sm" onClick={() => approveLoan(loan.id)}>Approve</button>
+                    <button className="btn btn-sm admin-only" onClick={() => approveLoan(loan.id)}>Approve</button>
                   )}
                   {loan.approvedByAdminId && !loan.issuedAt && (
                     <button className="btn btn-sm" onClick={() => issueLoan(loan.id)}>Issue</button>

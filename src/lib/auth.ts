@@ -96,20 +96,28 @@ export async function login(emailRaw: string, password: string): Promise<LoginRe
   return { ok: true, token };
 }
 
-export function getUserFromCookie(): { id: number; role: string; email: string } | null {
+/**
+ * The logged-in user, or null. The login token alone is not enough: the account is checked in
+ * the database on every request, so a switched-off or changed account stops working at once
+ * instead of staying signed in for the rest of the 8 hours.
+ */
+export async function getUserFromCookie(): Promise<{ id: number; role: string; email: string } | null> {
   try {
     const token = cookies().get(AUTH_COOKIE_NAME)?.value;
     if (!token) return null;
     const payload = jwt.verify(token, getJwtSecret()) as any;
-    return { id: Number(payload.sub), role: payload.role, email: payload.email };
+    const id = Number(payload.sub);
+    const row = await prisma.user.findUnique({ where: { id }, select: { status: true, role: true, email: true } });
+    if (!row || row.status !== 'active' || (row.role !== 'admin' && row.role !== 'staff')) return null;
+    return { id, role: row.role, email: row.email };
   } catch {
-    // Missing, expired or invalid token
+    // Missing, expired or invalid token, or the database could not be reached
     return null;
   }
 }
 
-export function requireRole(roles: Array<'admin' | 'staff'>) {
-  const u = getUserFromCookie();
+export async function requireRole(roles: Array<'admin' | 'staff'>) {
+  const u = await getUserFromCookie();
   if (!u || !roles.includes(u.role as any)) return null;
   return u;
 }
@@ -118,10 +126,11 @@ export function requireRole(roles: Array<'admin' | 'staff'>) {
  * For write routes: returns the logged-in admin, or a ready-made error response.
  * Usage: const g = guardAdmin(); if ('response' in g) return g.response; const u = g.user;
  */
-export function guardAdmin():
+export async function guardAdmin(): Promise<
   | { user: { id: number; role: string; email: string } }
-  | { response: NextResponse } {
-  const u = getUserFromCookie();
+  | { response: NextResponse }
+> {
+  const u = await getUserFromCookie();
   if (!u) return { response: NextResponse.json({ error: 'Please log in to continue.' }, { status: 401 }) };
   if (u.role !== 'admin') {
     return {
@@ -135,10 +144,11 @@ export function guardAdmin():
 }
 
 /** For read routes used by admins and staff. */
-export function guardStaffOrAdmin():
+export async function guardStaffOrAdmin(): Promise<
   | { user: { id: number; role: string; email: string } }
-  | { response: NextResponse } {
-  const u = requireRole(['admin', 'staff']);
+  | { response: NextResponse }
+> {
+  const u = await requireRole(['admin', 'staff']);
   if (!u) return { response: NextResponse.json({ error: 'Please log in to continue.' }, { status: 401 }) };
   return { user: u };
 }

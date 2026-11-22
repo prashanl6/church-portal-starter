@@ -11,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const id = Number(params.id);
   if (!Number.isInteger(id) || id < 1) return new NextResponse('Not found', { status: 404 });
 
-  const user = getUserFromCookie();
+  const user = await getUserFromCookie();
   const isStaff = !!user && (user.role === 'admin' || user.role === 'staff');
 
   const meta = await prisma.storedFile.findUnique({

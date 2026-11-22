@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit';
 
 export async function GET() {
   // Includes sermons still waiting for approval, so only signed-in staff and admins may list them.
-  const g = guardStaffOrAdmin();
+  const g = await guardStaffOrAdmin();
   if ('response' in g) return g.response;
   try {
     const list = await prisma.sermon.findMany({ orderBy: { date: 'desc' }, take: 50 });
@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const u = getUserFromCookie();
+    const u = await getUserFromCookie();
     if (!u) {
       return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
     }

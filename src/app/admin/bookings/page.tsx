@@ -166,7 +166,7 @@ function AdminBookingsPageContent() {
                   </a>
                 )}
                   <button
-                    className="btn-quiet danger"
+                    className="btn-quiet danger admin-only"
                     style={{ marginLeft: 'auto' }}
                     onClick={async () => {
                       if (!await ask(`Are you sure you want to request deletion of booking ${booking.bookingRef}? This will require approval before the booking is deleted.`)) {
@@ -200,7 +200,7 @@ function AdminBookingsPageContent() {
         )}
       </div>
 
-      <div className="card stack" style={{ gap: '1rem' }}>
+      <div className="card stack admin-only" style={{ gap: '1rem' }}>
         <div>
           <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>Hall hire pricing</h2>
           <p style={{ margin: 0, color: 'var(--text-2)' }}>

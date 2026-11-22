@@ -8,7 +8,7 @@ import { audit } from '@/lib/audit';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const u = getUserFromCookie();
+  const u = await getUserFromCookie();
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }

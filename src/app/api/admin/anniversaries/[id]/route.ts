@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit';
 import { anniversaryUpdateSchema, firstIssue, definedOnly } from '@/lib/validate';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const u = g.user;
   const id = Number(params.id);

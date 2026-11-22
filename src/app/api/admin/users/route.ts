@@ -13,7 +13,7 @@ const SYSTEM_EMAIL = 'system@church.local';
 
 /** Staff and administrator accounts (never the internal system account). */
 export async function GET() {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const list = await prisma.user.findMany({
     where: { email: { not: SYSTEM_EMAIL }, role: { in: ['admin', 'staff'] } },
@@ -33,7 +33,7 @@ const accountSchema = z.object({
 
 /** Ask for a new account. It is created only when a different administrator approves. */
 export async function POST(req: Request) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const parsed = accountSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });

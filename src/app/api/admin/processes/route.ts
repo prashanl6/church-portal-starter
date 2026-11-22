@@ -7,7 +7,7 @@ import { parseProcessAudience } from '@/lib/processAudience';
 import { sanitizeRichHtml } from '@/lib/sanitizeHtml';
 
 export async function GET() {
-  const u = requireRole(['admin', 'staff']);
+  const u = await requireRole(['admin', 'staff']);
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }
@@ -28,7 +28,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const u = getUserFromCookie();
+  const u = await getUserFromCookie();
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }

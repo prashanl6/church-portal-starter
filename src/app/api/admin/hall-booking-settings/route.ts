@@ -7,7 +7,7 @@ import { getHallBookingSettings } from '@/lib/hallBookingSettingsDb';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const u = requireRole(['admin', 'staff']);
+  const u = await requireRole(['admin', 'staff']);
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }
@@ -22,7 +22,7 @@ export async function GET() {
 
 /** A rate change is a money change: one admin proposes, a different admin approves. */
 export async function PATCH(req: Request) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const body = await req.json().catch(() => null);
   const raw = body?.ratePer30Minutes;

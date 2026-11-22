@@ -497,7 +497,7 @@ export default function PeopleEventsPage() {
                           </button>
                           <button
                             type="button"
-                            className="btn-secondary btn-sm"
+                            className="btn-secondary btn-sm admin-only"
                             onClick={() => toggleIndividualStatus(e.id, e.status)}
                           >
                             {e.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -541,7 +541,7 @@ export default function PeopleEventsPage() {
             )}
           </div>
 
-          <form onSubmit={submitBirthday} className="card form-grid">
+          <form onSubmit={submitBirthday} className="card form-grid admin-only">
             <h2 className="section-label">Add individual (birthday)</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -680,7 +680,7 @@ export default function PeopleEventsPage() {
                           </button>
                           <button
                             type="button"
-                            className="btn-secondary btn-sm"
+                            className="btn-secondary btn-sm admin-only"
                             onClick={() => toggleAnniversaryStatus(e.id, e.status)}
                           >
                             {e.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -769,7 +769,7 @@ export default function PeopleEventsPage() {
             )}
           </div>
 
-          <form onSubmit={submitAnniversary} className="card form-grid">
+          <form onSubmit={submitAnniversary} className="card form-grid admin-only">
             <h2 className="section-label">Add anniversary</h2>
             <p className="text-sm text-gray-600">
               Link two people already on file. Only anniversary date and notes are stored on this record.
@@ -885,7 +885,7 @@ export default function PeopleEventsPage() {
                           </button>
                           <button
                             type="button"
-                            className="btn-secondary btn-sm"
+                            className="btn-secondary btn-sm admin-only"
                             onClick={() => toggleIndividualStatus(e.id, e.status)}
                           >
                             Reactivate
@@ -993,7 +993,7 @@ export default function PeopleEventsPage() {
                           </button>
                           <button
                             type="button"
-                            className="btn-secondary btn-sm"
+                            className="btn-secondary btn-sm admin-only"
                             onClick={() => toggleAnniversaryStatus(e.id, e.status)}
                           >
                             Reactivate

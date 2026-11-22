@@ -5,7 +5,7 @@ import { audit } from '@/lib/audit';
 
 /** Only an admin, and not the person who asked for the loan, may approve it. */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const loanId = Number(params.id);
   const loan = await prisma.medicalLoan.findUnique({ where: { id: loanId } });

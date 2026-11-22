@@ -105,7 +105,7 @@ export default function ChurchBankAccountAdminPage() {
         </section>
       )}
 
-      <form onSubmit={onSubmit} className="card form-grid two">
+      <form onSubmit={onSubmit} className="card form-grid two admin-only">
         <div className="span-2">
           <h2 className="section-label" style={{ marginBottom: '0.35rem' }}>Propose new details</h2>
           <p className="hint" style={{ marginTop: 0 }}>

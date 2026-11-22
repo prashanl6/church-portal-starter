@@ -5,7 +5,7 @@ import { audit } from '@/lib/audit';
 
 /** Staff or admin records a request to lend an item. An admin must approve before it is handed over. */
 export async function POST(req: Request) {
-  const g = guardStaffOrAdmin();
+  const g = await guardStaffOrAdmin();
   if ('response' in g) return g.response;
   const body = await req.json().catch(() => ({}));
   const itemId = Number(body?.itemId);

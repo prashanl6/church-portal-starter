@@ -6,7 +6,7 @@ import { assetSchema, firstIssue } from '@/lib/validate';
 import { audit } from '@/lib/audit';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const u = g.user;
   
@@ -63,7 +63,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const u = g.user;
   

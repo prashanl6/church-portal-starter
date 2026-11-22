@@ -12,7 +12,7 @@ function fmtDate(v: unknown) {
 }
 
 export async function GET() {
-  const g = guardStaffOrAdmin();
+  const g = await guardStaffOrAdmin();
   if ('response' in g) return g.response;
   const me = g.user;
   const list = await prisma.approval.findMany({ 

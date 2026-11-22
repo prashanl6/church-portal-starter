@@ -3,7 +3,7 @@ import { reject, ApprovalError } from '@/lib/approval';
 import { guardAdmin } from '@/lib/auth';
 
 export async function POST(req: Request) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const body = await req.json().catch(() => ({}));
   const approvalId = Number(body?.approvalId);

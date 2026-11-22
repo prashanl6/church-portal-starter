@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit';
 import { assetSchema, firstIssue } from '@/lib/validate';
 
 export async function GET() {
-  const g = guardStaffOrAdmin();
+  const g = await guardStaffOrAdmin();
   if ('response' in g) return g.response;
 
   const assets = await prisma.asset.findMany({ orderBy: { createdAt: 'desc' }, take: 500 });
@@ -30,7 +30,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const u = g.user;
 

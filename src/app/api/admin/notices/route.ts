@@ -9,7 +9,7 @@ import { hydrateNoticeBodiesWithPeopleSnapshot } from '@/lib/noticePeopleSnapsho
 
 export async function GET() {
   // Includes drafts and pending notices, so only signed-in staff and admins may list them.
-  const g = guardStaffOrAdmin();
+  const g = await guardStaffOrAdmin();
   if ('response' in g) return g.response;
   const list = await prisma.notice.findMany({ orderBy: { weekOf: 'desc' }, take: 50 });
   const hydrated = await hydrateNoticeBodiesWithPeopleSnapshot(list);
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const u = g.user;
   const parsed = noticeSchema.safeParse(await req.json().catch(() => null));

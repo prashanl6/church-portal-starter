@@ -61,6 +61,12 @@ export default function Header() {
   }, []);
 
   // Close the menu after navigating, and stop the page scrolling behind it.
+  // Lets CSS hide change controls from staff (class "admin-only").
+  useEffect(() => {
+    if (userRole) document.documentElement.dataset.role = userRole;
+    else delete document.documentElement.dataset.role;
+  }, [userRole]);
+
   useEffect(() => setMenuOpen(false), [pathname]);
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';

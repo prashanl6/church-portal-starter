@@ -3,7 +3,7 @@ import { getUserFromCookie } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
-  const user = getUserFromCookie();
+  const user = await getUserFromCookie();
   if (!user) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }

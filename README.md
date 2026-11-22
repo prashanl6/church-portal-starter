@@ -85,14 +85,14 @@ Email notifications are enabled for booking requests. To configure:
 
 ## Running the tests
 
-`npm test` runs the whole test plan (54 cases, SEC-01 to PRF-01) against a running local site:
+`npm test` runs every test case (about 100, every page and function, tried as a visitor, as staff and as two different administrators) against a running local site, and writes the full list with results to [docs/TEST_CASES.md](docs/TEST_CASES.md):
 
 ```bash
-npm run build && npm start      # in one terminal
+npm run dev                     # in one terminal (needs a local test database in .env)
 npm test                        # in another
 ```
 
-Run it on a freshly seeded **local** test database (`npm run seed`, `npm run seed:extra-users`, `npm run seed:reference`). It refuses to run against anything but localhost, creates test records and locks `staff3@example.com` for 15 minutes.
+`npm test` first **wipes and re-seeds the local test database** (`scripts/reset-test-db.js`), so it refuses to run unless `DATABASE_URL` and `BASE_URL` both point at localhost. It creates test records and switches off two demo administrators. The suites are `tests/test-plan.api.mjs` (the original plan) and `tests/full-coverage.api.mjs` (role matrix and the rest); both use the helpers in `tests/lib.mjs`. Never run them against the live site.
 
 ## Reference data
 

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /** Ask to switch off an account (it can no longer log in). Needs a second administrator. */
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const id = Number(params.id);
   const user = Number.isInteger(id) ? await prisma.user.findUnique({ where: { id } }) : null;

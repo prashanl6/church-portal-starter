@@ -4,7 +4,7 @@ import { guardAdmin } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 
 export async function POST(req: Request) {
-  const g = guardAdmin();
+  const g = await guardAdmin();
   if ('response' in g) return g.response;
   const body = await req.json().catch(() => ({}));
   const name = String(body?.name ?? '').trim();

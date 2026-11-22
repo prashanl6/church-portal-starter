@@ -5,7 +5,7 @@ import { submitApproval } from '@/lib/approval';
 import { audit } from '@/lib/audit';
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const u = getUserFromCookie();
+  const u = await getUserFromCookie();
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }

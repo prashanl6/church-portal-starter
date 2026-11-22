@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
 
 export async function GET() {
-  const u = getUserFromCookie();
+  const u = await getUserFromCookie();
   if (!u) {
     return NextResponse.json({ count: 0 }, { status: 200 });
   }

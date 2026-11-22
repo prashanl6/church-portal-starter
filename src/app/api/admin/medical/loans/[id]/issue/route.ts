@@ -4,7 +4,7 @@ import { guardStaffOrAdmin } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const g = guardStaffOrAdmin();
+  const g = await guardStaffOrAdmin();
   if ('response' in g) return g.response;
   const loanId = Number(params.id);
   const loan = await prisma.medicalLoan.findUnique({ where: { id: loanId } });

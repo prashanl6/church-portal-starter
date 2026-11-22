@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const user = getUserFromCookie();
+    const user = await getUserFromCookie();
     const list = await prisma.processDoc.findMany({
       where: {
         status: 'published',

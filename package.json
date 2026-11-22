@@ -11,8 +11,9 @@
     "prisma:studio": "prisma studio",
     "seed": "node -e \"require('./scripts/seed.js').seed()\"",
     "seed:extra-users": "node scripts/seed-extra-staff-admins.js",
-    "test": "node tests/test-plan.api.mjs",
-    "seed:reference": "node scripts/seed-reference-data.js"
+    "test": "node tests/run-all.mjs",
+    "seed:reference": "node scripts/seed-reference-data.js",
+    "test:reset": "node scripts/reset-test-db.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

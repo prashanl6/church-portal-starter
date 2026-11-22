@@ -1,13 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth';
+import { requireRole, guardAdmin } from '@/lib/auth';
 
 // Default categories
 // Where an item belongs or what kind it is (requirement: label category such as Chapel or Hall).
 const DEFAULT_CATEGORIES = ['Chapel', 'Main Hall', 'Furniture', 'Sound Equipment', 'AV Equipment', 'Cutlery and Dishware', 'Medical Equipment'];
 
 export async function GET() {
-  const u = requireRole(['admin', 'staff']);
+  const u = await requireRole(['admin', 'staff']);
   if (!u) {
     return NextResponse.json({ error: 'Please log in to continue' }, { status: 401 });
   }
@@ -31,10 +31,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const u = requireRole(['admin']);
-  if (!u) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-  }
+  const g = await guardAdmin();
+  if ('response' in g) return g.response;
 
   try {
     const body = await req.json();

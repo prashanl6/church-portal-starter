@@ -118,7 +118,7 @@ export default function AdminSermonsPage() {
         title="Add a sermon"
         subtitle="When you submit, a second administrator checks the sermon before it appears on the website."
       />
-      <form onSubmit={handleSubmit} className="card panel-enter form-grid two">
+      <form onSubmit={handleSubmit} className="card panel-enter form-grid two admin-only">
         <div>
           <label className="label" htmlFor="s-title">Title</label>
           <input id="s-title" className="input" value={title} onChange={e => setTitle(e.target.value)} />
@@ -178,7 +178,7 @@ export default function AdminSermonsPage() {
                 </span>
                 <StatusBadge status={s.status} />
                 {s.status === 'published' && (
-                  <button type="button" className="btn-quiet danger" onClick={() => requestDelete(s)}>
+                  <button type="button" className="btn-quiet danger admin-only" onClick={() => requestDelete(s)}>
                     Remove
                   </button>
                 )}
